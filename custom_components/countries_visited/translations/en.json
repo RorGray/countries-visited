@@ -1,0 +1,28 @@
+{
+  "config": {
+    "title": "Countries Visited",
+    "step": {
+      "user": {
+        "title": "Select Person",
+        "data": {
+          "person": "Person",
+          "map_color": "Default Map Color",
+          "visited_color": "Visited Country Color"
+        }
+      }
+    },
+    "options": {
+      "title": "Countries Visited Options",
+      "step": {
+        "init": {
+          "title": "Settings",
+          "data": {
+            "person": "Person",
+            "map_color": "Default Map Color",
+            "visited_color": "Visited Country Color"
+          }
+        }
+      }
+    }
+  }
+}

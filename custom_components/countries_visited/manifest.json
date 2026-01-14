@@ -1,0 +1,10 @@
+{
+  "domain": "countries_visited",
+  "name": "Countries Visited",
+  "documentation": "https://github.com/yourusername/countries-visited",
+  "version": "1.0.0",
+  "requirements": [],
+  "codeowners": ["@yourusername"],
+  "config_flow": true,
+  "iot_class": "local_polling"
+}

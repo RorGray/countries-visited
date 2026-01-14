@@ -1,0 +1,9 @@
+{
+  "name": "Countries Visited",
+  "description": "Track and visualize countries visited by family members on a world map",
+  "country": "XX",
+  "domains": ["sensor"],
+  "homeassistant": "2024.1.0",
+  "render_readme": true,
+  "issues": "https://github.com/yourusername/countries-visited/issues"
+}

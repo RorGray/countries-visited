@@ -1,0 +1,36 @@
+countries_visited:
+  add_country:
+    description: Add a country to a person's visited list
+    fields:
+      person:
+        description: Person entity ID
+        example: person.john
+        required: true
+      country_code:
+        description: ISO 3166-1 alpha-2 country code
+        example: US
+        required: true
+  
+  remove_country:
+    description: Remove a country from a person's visited list
+    fields:
+      person:
+        description: Person entity ID
+        example: person.john
+        required: true
+      country_code:
+        description: ISO 3166-1 alpha-2 country code
+        example: US
+        required: true
+  
+  set_countries:
+    description: Set the complete list of visited countries for a person
+    fields:
+      person:
+        description: Person entity ID
+        example: person.john
+        required: true
+      country_codes:
+        description: List of ISO 3166-1 alpha-2 country codes
+        example: ["US", "GB", "DE"]
+        required: true
