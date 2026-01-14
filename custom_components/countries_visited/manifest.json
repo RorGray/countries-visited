@@ -1,10 +1,20 @@
 {
   "domain": "countries_visited",
   "name": "Countries Visited",
-  "documentation": "https://github.com/yourusername/countries-visited",
+  "documentation": "https://github.com/suxarik/ha-countries-visited-plugin",
   "version": "v0.0.2",
   "requirements": [],
-  "codeowners": ["@yourusername"],
+  "codeowners": ["@suxarik"],
   "config_flow": true,
-  "iot_class": "local_polling"
+  "iot_class": "local_polling",
+  "lovelace": {
+    "dashboards": {
+      "countries-visited": {
+        "title": "Countries Visited",
+        "icon": "mdi:earth",
+        "filename": "www/community/countries-visited/countries-visited.js",
+        "show_in_sidebar": false
+      }
+    }
+  }
 }
