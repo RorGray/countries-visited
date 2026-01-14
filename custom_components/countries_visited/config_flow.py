@@ -4,7 +4,7 @@ from __future__ import annotations
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.core import callback
-from homeassistant.helpers import selector
+from homeassistant.helpers import config_validation as cv
 import homeassistant.helpers.entity_registry as er
 
 from .const import CONF_MAP_COLOR, CONF_PERSON, CONF_VISITED_COLOR, DOMAIN
@@ -37,9 +37,7 @@ class CountriesVisitedConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         data_schema = vol.Schema(
             {
-                vol.Required(CONF_PERSON): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain="person")
-                ),
+                vol.Required(CONF_PERSON): vol.In(persons) if persons else str,
                 vol.Optional(CONF_MAP_COLOR, default="#e0e0e0"): str,
                 vol.Optional(CONF_VISITED_COLOR, default="#4CAF50"): str,
             }
@@ -72,9 +70,7 @@ class CountriesVisitedOptionsFlow(config_entries.OptionsFlow):
         data_schema = vol.Schema(
             {
                 vol.Required(CONF_PERSON, default=self.config_entry.data.get(CONF_PERSON)): 
-                    selector.EntitySelector(
-                        selector.EntitySelectorConfig(domain="person")
-                    ),
+                    vol.In(persons) if persons else str,
                 vol.Optional(CONF_MAP_COLOR, default=self.config_entry.data.get(CONF_MAP_COLOR, "#e0e0e0")): str,
                 vol.Optional(CONF_VISITED_COLOR, default=self.config_entry.data.get(CONF_VISITED_COLOR, "#4CAF50")): str,
             }

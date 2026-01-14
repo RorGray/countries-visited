@@ -178,18 +178,28 @@ class CountriesVisitedSensor(SensorEntity):
         detected = set()
         
         try:
-            # Get history for the person entity
-            history = await self.hass.async_add_executor_job(
-                self.hass.components.history.get_state,
-                self.hass,
-                None,  # no end time, get all
-                person_entity,
-            )
-            
-            if not history or person_entity not in history:
+            # Check if history component is available
+            if not hasattr(self.hass, 'components') or not hasattr(self.hass.components, 'history'):
+                _LOGGER.debug("History component not available")
                 return list(detected)
             
-            states = history[person_entity]
+            history_component = self.hass.components.history
+            
+            # Use async API if available (HA 2022.4+)
+            if hasattr(history_component, 'async_get_state'):
+                # Newer HA versions (2022.4+)
+                state = await history_component.async_get_state(self.hass, None, person_entity)
+                states = state if state else []
+            else:
+                # Legacy API fallback
+                try:
+                    states = await self.hass.async_add_executor_job(
+                        lambda: history_component.get_state(self.hass, None, person_entity)
+                    )
+                    states = states.get(person_entity, []) if states else []
+                except Exception:
+                    _LOGGER.debug("Could not fetch history")
+                    return list(detected)
             
             for state in states:
                 # Check if state has GPS coordinates
