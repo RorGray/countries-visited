@@ -2,7 +2,7 @@
   "domain": "countries_visited",
   "name": "Countries Visited",
   "documentation": "https://github.com/yourusername/countries-visited",
-  "version": "0.0.2",
+  "version": "v0.0.2",
   "requirements": [],
   "codeowners": ["@yourusername"],
   "config_flow": true,
