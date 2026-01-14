@@ -3,7 +3,7 @@
   "description": "Track and visualize countries visited by family members on a world map",
   "country": "XX",
   "categories": ["plugin"],
-  "homeassistant": "2024.1.0",
+  "homeassistant": "2024.11.0",
   "render_readme": true,
   "issues": "https://github.com/suxarik/ha-countries-visited-plugin/issues"
 }
