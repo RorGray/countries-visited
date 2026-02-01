@@ -4,7 +4,7 @@ let countriesData = null;
 export async function loadCountriesData() {
   if (countriesData) return countriesData;
   try {
-    const svgPath = '/www/community/countries_visited/data/world.svg';  // HA absolute path
+    const svgPath = './data/world.svg';  // HA absolute path
     
     let svgText = null;
     try {
@@ -27,7 +27,7 @@ export async function loadCountriesData() {
     const svgDoc = parser.parseFromString(svgText, 'image/svg+xml');
     const paths = svgDoc.querySelectorAll('path');
     
-    const infoPath = '/www/community/countries_visited/data/country-info.json';  // HA absolute path
+    const infoPath = './data/country-info.json';  // HA absolute path
     const response = await fetch(infoPath);
     const countryInfo = await response.json();
     

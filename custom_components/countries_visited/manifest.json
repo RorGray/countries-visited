@@ -1,7 +1,7 @@
 {
   "domain": "countries_visited",
   "name": "Countries Visited",
-  "documentation": "https://github.com/RorGray/ha-countries-visited-plugin",
+  "documentation": "https://github.com/RorGray/countries-visited",
   "version": "v0.1",
   "requirements": [],
   "codeowners": ["@suxarik", "@RorGray"],

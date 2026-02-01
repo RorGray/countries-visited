@@ -1,6 +1,6 @@
 # Countries Visited for Home Assistant
 
-![GitHub release (latest by date)](https://img.shields.io/github/v/release/RorGray/ha-countries-visited-plugin?style=for-the-badge)
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/RorGray/countries-visited?style=for-the-badge)
 ![HACS validated](https://img.shields.io/badge/HACS-Default-orange?style=for-the-badge)
 
 A Home Assistant integration to track and visualize countries visited by family members on an interactive world map.
@@ -23,7 +23,7 @@ A Home Assistant integration to track and visualize countries visited by family 
 
 1. Add this repository to HACS:
    - Go to **HACS** → **Integrations** → **⋮** → **Add custom repository**
-   - Repository: `https://github.com/RorGray/ha-countries-visited-plugin`
+   - Repository: `https://github.com/RorGray/countries-visited`
    - Category: **Integration**
 2. Install "Countries Visited" from HACS
 3. Restart Home Assistant
@@ -167,5 +167,5 @@ This project is licensed under the [MIT License](https://opensource.org/license/
 
 ## Support
 
-- [GitHub Issues](https://github.com/RorGray/ha-countries-visited-plugin/issues)
+- [GitHub Issues](https://github.com/RorGray/countries-visited/issues)
 - [Home Assistant Community](https://community.home-assistant.io/)

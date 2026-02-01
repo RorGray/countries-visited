@@ -1,4 +1,4 @@
-import { loadCountriesData } from '/www/community/countries_visited/map-data.js';
+import { loadCountriesData } from './countries_visited/map-data.js';
 
 class CountriesMapCard extends HTMLElement {
   set hass(hass) {
@@ -254,7 +254,7 @@ if (window.customCards) {
     name: 'Countries Visited',
     description: 'Interactive world map showing visited countries',
     preview: false,
-    documentationURL: 'https://github.com/RorGray/ha-countries-visited-plugin'
+    documentationURL: 'https://github.com/RorGray/countries-visited'
   });
 }
 
