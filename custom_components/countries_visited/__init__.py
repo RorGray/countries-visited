@@ -23,7 +23,12 @@ _log_file_handler = None
 
 
 def _setup_file_logging(hass: HomeAssistant):
-    """Set up optional file logging for Countries Visited."""
+    """Set up file logging for Countries Visited.
+    
+    Creates two handlers:
+    - File handler: DEBUG level (all logs to countries_visited.log)
+    - Console filter: Suppresses INFO/DEBUG from console (WARNING+ only)
+    """
     global _log_file_handler
     
     try:
@@ -35,16 +40,11 @@ def _setup_file_logging(hass: HomeAssistant):
         # Set logger level to DEBUG to capture all messages
         root_logger.setLevel(logging.DEBUG)
         
-        # Create file handler
-        file_handler = logging.FileHandler(log_file, encoding="utf-8", mode="a")
-        file_handler.setLevel(logging.DEBUG)
-        
         # Create formatter
         formatter = logging.Formatter(
             "%(asctime)s [%(levelname)-8s] %(name)s: %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S"
         )
-        file_handler.setFormatter(formatter)
         
         # Prevent duplicate handlers - remove any existing file handlers for this log file
         existing_handlers = [h for h in root_logger.handlers if isinstance(h, logging.FileHandler)]
@@ -56,17 +56,28 @@ def _setup_file_logging(hass: HomeAssistant):
             except (AttributeError, OSError):
                 pass
         
-        # Add handler to root logger
+        # Create file handler - DEBUG level (all logs to file)
+        file_handler = logging.FileHandler(log_file, encoding="utf-8", mode="a")
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(formatter)
         root_logger.addHandler(file_handler)
         _log_file_handler = file_handler
         
-        # Ensure propagation is enabled (default, but make sure)
-        root_logger.propagate = True
+        # Disable propagation to prevent duplicate logs in console
+        # We'll handle console output ourselves with a WARNING+ handler
+        root_logger.propagate = False
         
-        # Write initial message to confirm logging works
+        # Add console handler for WARNING+ only
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.WARNING)
+        console_handler.setFormatter(formatter)
+        root_logger.addHandler(console_handler)
+        
+        # Write initial message to file
         root_logger.info(f"Countries Visited file logging initialized: {log_file}")
         root_logger.info("=" * 80)
         root_logger.info("Countries Visited Integration Log")
+        root_logger.info("Full logs: countries_visited.log | Console: WARNING+ only")
         root_logger.info("=" * 80)
         
     except Exception as e:

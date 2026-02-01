@@ -112,7 +112,6 @@ async def get_country_from_coords(hass, lat, lon):
     if cache_key in _COORDINATE_CACHE:
         cached_result = _COORDINATE_CACHE[cache_key]
         _CACHE_STATS["cache_hits"] += 1
-        _LOGGER.debug("Using cached country for (%s, %s): %s", lat, lon, cached_result)
         # Notify cache statistics sensors to update
         _notify_cache_stats_updated(hass)
         return cached_result
@@ -135,7 +134,6 @@ async def get_country_from_coords(hass, lat, lon):
         
         if time_since_last_call < RATE_LIMIT_SECONDS:
             wait_time = RATE_LIMIT_SECONDS - time_since_last_call
-            _LOGGER.debug(f"Rate limiting: waiting {wait_time:.2f}s before API call")
             await asyncio.sleep(wait_time)
         
         # Update last API call time
@@ -152,12 +150,8 @@ async def get_country_from_coords(hass, lat, lon):
                     country_code = address.get("country_code", "").upper()
                     if country_code and len(country_code) == 2:
                         return country_code
-                    else:
-                        _LOGGER.debug(
-                            "Invalid country code from geocoding: %s", country_code
-                        )
             except (GeocoderTimedOut, GeocoderServiceError) as e:
-                _LOGGER.debug("Geocoding error for (%s, %s): %s", lat, lon, e)
+                pass  # Geocoding errors are expected and don't need logging
                 return None
             except Exception as e:
                 _LOGGER.warning("Unexpected geocoding error: %s", e)
@@ -172,10 +166,6 @@ async def get_country_from_coords(hass, lat, lon):
         # Cache the result (both success and failure)
         _COORDINATE_CACHE[cache_key] = country_code
         
-        if country_code:
-            _LOGGER.debug("Resolved (%s, %s) to country: %s", lat, lon, country_code)
-        else:
-            _LOGGER.debug("Could not resolve country for (%s, %s)", lat, lon)
         
         # Notify cache statistics sensors to update
         _notify_cache_stats_updated(hass)
@@ -252,35 +242,30 @@ class CountriesVisitedSensor(SensorEntity):
         
         # Get manually tracked countries from entity attributes
         manual_countries = list(state.attributes.get("visited_countries", []))
-        _LOGGER.debug(f"Manual countries from {person_entity}: {manual_countries}")
         
         # Detect countries from history
         history_countries = await self._detect_countries_from_history(person_entity)
-        _LOGGER.info(f"Detected {len(history_countries)} countries from history: {history_countries}")
         
         # Merge countries (manual + detected)
         visited_countries = list(set(manual_countries + history_countries))
         visited_countries.sort()
         
-        _LOGGER.info(
-            f"Total visited countries for {person_entity}: {len(visited_countries)} "
-            f"(manual: {len(manual_countries)}, detected: {len(history_countries)})"
-        )
-        
         # Update state only if changed
         if visited_countries != self._last_visited_countries:
             self._last_visited_countries = visited_countries
-            _LOGGER.info(f"Countries list updated: {visited_countries}")
+            _LOGGER.info(
+                f"Countries list updated for {person_entity}: {len(visited_countries)} countries "
+                f"(manual: {len(manual_countries)}, detected: {len(history_countries)})"
+            )
             
         # Get current location for current country detection
         current_country = await self._get_current_country(person_entity)
         if current_country:
-            _LOGGER.debug(f"Current country for {person_entity}: {current_country}")
             # Add current country to visited list if not already there
             if current_country not in visited_countries:
                 visited_countries.append(current_country)
                 visited_countries.sort()
-                _LOGGER.info(f"Added current country {current_country} to visited list")
+                _LOGGER.info(f"Added current country {current_country} to visited list for {person_entity}")
         
         # Get country names for display (after adding current country)
         country_names = [
@@ -296,8 +281,6 @@ class CountriesVisitedSensor(SensorEntity):
             "manual_countries": manual_countries,
             "current_country": current_country,
         }
-        
-        _LOGGER.debug(f"Sensor updated - state: {self._attr_native_value}, attributes: {self._attr_extra_state_attributes}")
 
     async def _get_current_country(self, person_entity):
         """Get the current country based on person's current GPS location."""
@@ -335,8 +318,6 @@ class CountriesVisitedSensor(SensorEntity):
             # Get history from last 365 days
             end_time = datetime.now()
             start_time = end_time - timedelta(days=365)
-            
-            _LOGGER.debug(f"Fetching history for {person_entity} from {start_time} to {end_time}")
             
             # Format timestamps for API (ISO 8601 format)
             start_time_str = start_time.isoformat()
@@ -393,12 +374,10 @@ class CountriesVisitedSensor(SensorEntity):
                 return list(detected)
             
             if not data or not isinstance(data, list) or len(data) == 0:
-                _LOGGER.debug(f"No history found for {person_entity}")
                 return list(detected)
             
             # Extract states for our entity (first array in response)
             entity_states = data[0] if data else []
-            _LOGGER.info(f"Retrieved {len(entity_states)} history states for {person_entity}")
             
             # Extract GPS coordinates from history states
             # API returns dict objects, not State objects
@@ -427,21 +406,17 @@ class CountriesVisitedSensor(SensorEntity):
             # Resolve coordinates to countries (with caching and rate limiting)
             # Process unique coordinates only to minimize API calls
             unique_coords = list(set(coordinates_to_resolve))
-            _LOGGER.debug(
-                "Processing %d unique coordinates from history (total: %d)",
-                len(unique_coords),
-                len(coordinates_to_resolve)
-            )
             
             # Limit processing to avoid excessive API calls
             # Process max 100 coordinates per update to avoid timeouts
             max_coords = 100
             if len(unique_coords) > max_coords:
-                _LOGGER.info(
-                    "Limiting history processing to %d coordinates (found %d). "
+                _LOGGER.warning(
+                    "Limiting history processing to %d coordinates (found %d) for %s. "
                     "Consider running detection periodically rather than on every update.",
                     max_coords,
-                    len(unique_coords)
+                    len(unique_coords),
+                    person_entity
                 )
                 unique_coords = unique_coords[:max_coords]
             
@@ -451,21 +426,17 @@ class CountriesVisitedSensor(SensorEntity):
                 if country_code:
                     detected.add(country_code)
                     detected_count += 1
-                    _LOGGER.debug(f"Detected country {country_code} from coordinates ({lat}, {lon})")
                 # No additional delay needed - rate limiting is handled in get_country_from_coords
             
-            _LOGGER.info(
-                f"History processing complete for {person_entity}: "
-                f"{detected_count} countries detected from {len(unique_coords)} coordinates, "
-                f"total unique countries: {len(detected)}"
-            )
+            if detected_count > 0:
+                _LOGGER.info(
+                    f"Detected {len(detected)} countries from history for {person_entity}: {sorted(detected)}"
+                )
                                 
         except Exception as err:
             _LOGGER.warning("Error detecting countries from history: %s", err, exc_info=True)
         
-        result = list(detected)
-        _LOGGER.debug(f"Returning {len(result)} detected countries: {result}")
-        return result
+        return list(detected)
 
 
 class CacheStatisticsSensor(SensorEntity):
