@@ -354,7 +354,7 @@ class CountriesVisitedSensor(SensorEntity):
             # Try to get history states - use multiple API methods
             states = []
             
-            # Method 1: Try async_get_state (HA 2022.4+)
+            # Method 1: Try async_get_state (HA 2022.4+) - works with hass.components.history
             if hasattr(history_component, 'async_get_state'):
                 try:
                     _LOGGER.debug(f"Using async_get_state API for {person_entity}")
@@ -371,7 +371,7 @@ class CountriesVisitedSensor(SensorEntity):
                 except Exception as e:
                     _LOGGER.debug(f"async_get_state failed: {e}, trying fallback")
             
-            # Method 2: Try get_state (legacy API)
+            # Method 2: Try get_state (legacy API) - works with hass.components.history
             if not states and hasattr(history_component, 'get_state'):
                 try:
                     _LOGGER.debug(f"Using get_state API for {person_entity}")
@@ -389,34 +389,71 @@ class CountriesVisitedSensor(SensorEntity):
                 except Exception as e:
                     _LOGGER.debug(f"get_state failed: {e}")
             
-            # Method 3: Try using recorder API directly via hass
-            if not states and 'recorder' in self.hass.config.components:
+            # Method 3: Try using recorder history API directly (when history module is imported)
+            if not states:
                 try:
                     from datetime import datetime, timedelta
-                    _LOGGER.debug(f"Trying recorder API for {person_entity}")
+                    from homeassistant.components.recorder import history as recorder_history
+                    _LOGGER.debug(f"Trying recorder.history.get_significant_states API for {person_entity}")
                     # Get history from last 365 days
                     end_time = datetime.now()
                     start_time = end_time - timedelta(days=365)
                     
-                    # Try to get from recorder component
-                    if hasattr(self.hass.components, 'recorder'):
-                        recorder = self.hass.components.recorder
-                        if hasattr(recorder, 'history'):
-                            result = await recorder.history.get_significant_states(
-                                self.hass,
-                                start_time,
-                                end_time,
-                                [person_entity],
-                                significant_changes_only=False
-                            )
-                            if result and person_entity in result:
-                                states = result[person_entity]
-                                _LOGGER.debug(f"Retrieved {len(states)} history states via recorder")
+                    # Check if recorder is loaded
+                    if 'recorder' not in self.hass.config.components:
+                        _LOGGER.debug("Recorder component not loaded, skipping recorder.history API")
+                    else:
+                        result = await recorder_history.get_significant_states(
+                            self.hass,
+                            start_time,
+                            end_time,
+                            [person_entity],
+                            significant_changes_only=False
+                        )
+                        if result and person_entity in result:
+                            states = result[person_entity]
+                            _LOGGER.info(f"Retrieved {len(states)} history states via recorder.history.get_significant_states")
+                except ImportError as e:
+                    _LOGGER.debug(f"recorder.history not available: {e}")
                 except Exception as e:
-                    _LOGGER.debug(f"recorder API failed: {e}")
+                    _LOGGER.debug(f"recorder.history API failed: {e}", exc_info=True)
+            
+            # Method 4: Try using the state machine's history directly
+            if not states:
+                try:
+                    _LOGGER.debug(f"Trying state machine history for {person_entity}")
+                    # Use the history component's state machine access
+                    if hasattr(history_component, 'get_significant_states'):
+                        from datetime import datetime, timedelta
+                        end_time = datetime.now()
+                        start_time = end_time - timedelta(days=365)
+                        result = await history_component.get_significant_states(
+                            self.hass,
+                            start_time,
+                            end_time,
+                            [person_entity],
+                            significant_changes_only=False
+                        )
+                        if result and person_entity in result:
+                            states = result[person_entity]
+                            _LOGGER.debug(f"Retrieved {len(states)} history states via get_significant_states")
+                except Exception as e:
+                    _LOGGER.debug(f"get_significant_states failed: {e}")
             
             if not states:
-                _LOGGER.warning(f"Could not retrieve history for {person_entity} using any method")
+                # Log detailed diagnostics
+                available_methods = [m for m in dir(history_component) if not m.startswith('_')]
+                _LOGGER.warning(
+                    f"Could not retrieve history for {person_entity} using any method. "
+                    f"History component type: {type(history_component)}, "
+                    f"Available methods: {available_methods[:10]}..."  # Limit to first 10 to avoid huge logs
+                )
+                _LOGGER.info(
+                    f"History component access: "
+                    f"hasattr(hass.components, 'history')={hasattr(self.hass, 'components') and hasattr(self.hass.components, 'history')}, "
+                    f"'history' in config.components={'history' in self.hass.config.components}, "
+                    f"'recorder' in config.components={'recorder' in self.hass.config.components}"
+                )
                 return list(detected)
             
             # Process states in batches to avoid too many API calls
