@@ -23,16 +23,48 @@ class CountriesMapCard extends HTMLElement {
     if (entity && entity.startsWith('person.')) {
       // Find the sensor entity for this person
       // The sensor entity has the person entity ID in its attributes
-      const sensorEntityId = Object.keys(this._hass.states).find(
-        stateId => stateId.startsWith('sensor.countries_visited_') &&
-                   this._hass.states[stateId]?.attributes?.person === entity
-      );
+      const allSensors = Object.keys(this._hass.states)
+        .filter(id => id.startsWith('sensor.countries_visited_'))
+        .map(id => ({
+          id,
+          state: this._hass.states[id],
+          person: this._hass.states[id]?.attributes?.person
+        }));
+      
+      // Try exact match first
+      let sensorEntityId = allSensors.find(s => s.person === entity)?.id;
+      
+      // If not found, try case-insensitive match
+      if (!sensorEntityId) {
+        const personLower = entity.toLowerCase();
+        const match = allSensors.find(s => s.person?.toLowerCase() === personLower);
+        if (match) {
+          sensorEntityId = match.id;
+        }
+      }
       
       if (sensorEntityId) {
         entity = sensorEntityId;
         console.debug(`Countries Map Card: Found sensor entity ${sensorEntityId} for person ${this._config.entity || this._config.person}`);
       } else {
-        console.warn(`Countries Map Card: Could not find sensor entity for person ${entity}. Make sure the integration is set up for this person.`);
+        console.warn(
+          `Countries Map Card: Could not find sensor entity for person ${entity}. ` +
+          `Available sensors: ${allSensors.map(s => `${s.id} (person: ${s.person})`).join(', ') || 'none'}`
+        );
+        // Don't proceed if we can't find the sensor entity
+        this.innerHTML = `
+          <div class="countries-card">
+            <div class="card-header">
+              <div class="card-title">Countries Visited</div>
+            </div>
+            <div style="padding: 20px; text-align: center; color: #888;">
+              <p>Could not find sensor entity for person: <strong>${entity}</strong></p>
+              <p>Please make sure the Countries Visited integration is configured for this person.</p>
+              ${allSensors.length > 0 ? `<p>Available sensors: ${allSensors.map(s => `${s.id} (person: ${s.person})`).join(', ')}</p>` : ''}
+            </div>
+          </div>
+        `;
+        return;
       }
     }
     

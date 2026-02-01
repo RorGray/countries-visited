@@ -21,16 +21,35 @@ async def async_setup_entry(
     async_add_entities([sensor])
     
     # Listen for sensor entity changes to update binary sensor
-    sensor_entity_id = f"sensor.countries_visited_{entry.entry_id}"
+    # Find the sensor entity first, then track it
+    def find_sensor_entity():
+        """Find the sensor entity for this person."""
+        # First try: Use entry_id (standard format)
+        sensor_entity_id = f"sensor.countries_visited_{entry.entry_id}"
+        state = hass.states.get(sensor_entity_id)
+        if state and state.attributes.get("person") == person_entity:
+            return sensor_entity_id
+        
+        # Fallback: Search all countries_visited sensors by person attribute
+        for entity_id in hass.states.async_entity_ids("sensor"):
+            if entity_id.startswith("sensor.countries_visited_"):
+                state = hass.states.get(entity_id)
+                if state and state.attributes.get("person") == person_entity:
+                    return entity_id
+        return None
     
-    @callback
-    def handle_sensor_change(entity_id, old_state, new_state):
-        if entity_id == sensor_entity_id:
-            sensor.async_schedule_update_ha_state(True)
+    sensor_entity_id = find_sensor_entity()
     
-    entry.async_on_unload(
-        event.async_track_state_change_event(hass, sensor_entity_id, handle_sensor_change)
-    )
+    if sensor_entity_id:
+        @callback
+        def handle_sensor_change(event):
+            """Handle state change for the sensor entity."""
+            if event.data.get("entity_id") == sensor_entity_id:
+                sensor.async_schedule_update_ha_state(True)
+        
+        entry.async_on_unload(
+            event.async_track_state_change_event(hass, sensor_entity_id, handle_sensor_change)
+        )
 
 
 class PersonVisitedAnywhereSensor(BinarySensorEntity):
@@ -52,11 +71,33 @@ class PersonVisitedAnywhereSensor(BinarySensorEntity):
         """Return unique ID."""
         return f"countries_visited_anywhere_{self._entry.entry_id}"
 
+    def _find_sensor_entity(self):
+        """Find the sensor entity for this person."""
+        person_entity = self._entry.data.get(CONF_PERSON)
+        
+        # First try: Use entry_id (standard format)
+        sensor_entity_id = f"sensor.countries_visited_{self._entry.entry_id}"
+        state = self.hass.states.get(sensor_entity_id)
+        if state and state.attributes.get("person") == person_entity:
+            return sensor_entity_id
+        
+        # Fallback: Search all countries_visited sensors by person attribute
+        for entity_id in self.hass.states.async_entity_ids("sensor"):
+            if entity_id.startswith("sensor.countries_visited_"):
+                state = self.hass.states.get(entity_id)
+                if state and state.attributes.get("person") == person_entity:
+                    return entity_id
+        
+        return None
+
     @property
     def is_on(self):
         """Return true if person has visited at least one country."""
-        # Read from the sensor entity, not the person entity
-        sensor_entity_id = f"sensor.countries_visited_{self._entry.entry_id}"
+        # Find the sensor entity (with fallback)
+        sensor_entity_id = self._find_sensor_entity()
+        if not sensor_entity_id:
+            return False
+        
         state = self.hass.states.get(sensor_entity_id)
         if state:
             visited_countries = state.attributes.get("visited_countries", [])
@@ -66,9 +107,15 @@ class PersonVisitedAnywhereSensor(BinarySensorEntity):
     @property
     def extra_state_attributes(self):
         """Return extra attributes."""
-        # Read from the sensor entity, not the person entity
+        # Find the sensor entity (with fallback)
         person_entity = self._entry.data.get(CONF_PERSON)
-        sensor_entity_id = f"sensor.countries_visited_{self._entry.entry_id}"
+        sensor_entity_id = self._find_sensor_entity()
+        if not sensor_entity_id:
+            return {
+                "person": person_entity,
+                "sensor_entity": None,
+            }
+        
         state = self.hass.states.get(sensor_entity_id)
         if state:
             visited_countries = state.attributes.get("visited_countries", [])
@@ -76,8 +123,12 @@ class PersonVisitedAnywhereSensor(BinarySensorEntity):
                 "visited_countries": visited_countries,
                 "count": len(visited_countries),
                 "person": person_entity,
+                "sensor_entity": sensor_entity_id,
             }
-        return {}
+        return {
+            "person": person_entity,
+            "sensor_entity": sensor_entity_id,
+        }
     
     async def async_update(self):
         """Update the binary sensor state."""
