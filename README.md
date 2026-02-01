@@ -39,6 +39,13 @@ A Home Assistant integration to track and visualize countries visited by family 
 3. Search for "Countries Visited"
 4. Select the person to track
 5. Configure colors (optional)
+6. **Access Token** (optional but recommended):
+   - Create a long-lived access token: **Profile** → **Long-Lived Access Tokens** → **Create Token**
+   - Copy the token and paste it in the integration configuration
+   - **Required for automatic history detection** - Without it, the integration will still work for:
+     - Current location detection (based on person's current GPS coordinates)
+     - Manual country management (via services)
+   - History detection from past locations will be skipped without a token
 
 ## Lovelace Card
 
@@ -177,12 +184,23 @@ The integration uses **reverse geocoding** to convert GPS coordinates (latitude/
 
 ### Setting up automatic tracking
 
-1. Ensure your person entities have GPS coordinates (latitude/longitude attributes)
-2. The integration will automatically process history and detect countries
-3. Country codes are resolved from coordinates using reverse geocoding
-4. Results are cached for future use
+1. **Create a long-lived access token** (required for history detection):
+   - Go to **Profile** → **Long-Lived Access Tokens** → **Create Token**
+   - Give it a name (e.g., "Countries Visited")
+   - Copy the token
+   - Add it in the integration settings: **Settings** → **Devices & Services** → **Countries Visited** → **Configure** → **Access Token**
 
-**Note**: Processing large amounts of history may take time due to rate limiting. The integration processes up to 100 unique coordinates per update to prevent timeouts.
+2. Ensure your person entities have GPS coordinates (latitude/longitude attributes)
+
+3. The integration will automatically process history and detect countries
+
+4. Country codes are resolved from coordinates using reverse geocoding
+
+5. Results are cached for future use
+
+**Note**: 
+- **Without an access token**: The integration will still work for current location detection and manual country management, but history detection will be skipped.
+- Processing large amounts of history may take time due to rate limiting. The integration processes up to 100 unique coordinates per update to prevent timeouts.
 
 ## Country Codes
 

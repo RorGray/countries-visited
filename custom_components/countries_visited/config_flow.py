@@ -7,7 +7,7 @@ from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.helpers import config_validation as cv
 
-from .const import CONF_MAP_COLOR, CONF_PERSON, CONF_VISITED_COLOR, DOMAIN
+from .const import CONF_ACCESS_TOKEN, CONF_MAP_COLOR, CONF_PERSON, CONF_VISITED_COLOR, DOMAIN
 
 # Use consistent logger name for easy filtering
 _LOGGER = logging.getLogger(f"custom_components.{DOMAIN}.config_flow")
@@ -50,12 +50,14 @@ class CountriesVisitedConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_PERSON, default=persons[0]): vol.In(persons),
                 vol.Optional(CONF_MAP_COLOR, default="#e0e0e0"): str,
                 vol.Optional(CONF_VISITED_COLOR, default="#4CAF50"): str,
+                vol.Optional(CONF_ACCESS_TOKEN, default=""): cv.string,
             }
         else:
             schema = {
                 vol.Required(CONF_PERSON): str,
                 vol.Optional(CONF_MAP_COLOR, default="#e0e0e0"): str,
                 vol.Optional(CONF_VISITED_COLOR, default="#4CAF50"): str,
+                vol.Optional(CONF_ACCESS_TOKEN, default=""): cv.string,
             }
 
         return self.async_show_form(
@@ -92,6 +94,16 @@ class CountriesVisitedOptionsFlow(config_entries.OptionsFlow):
                     vol.Required(CONF_PERSON, default=self.config_entry.data.get(CONF_PERSON, "")): str,
                     vol.Optional(CONF_MAP_COLOR, default=self.config_entry.data.get(CONF_MAP_COLOR, "#e0e0e0")): str,
                     vol.Optional(CONF_VISITED_COLOR, default=self.config_entry.data.get(CONF_VISITED_COLOR, "#4CAF50")): str,
+                    vol.Optional(
+                        CONF_ACCESS_TOKEN,
+                        default=self.config_entry.data.get(CONF_ACCESS_TOKEN, ""),
+                        description={
+                            "suggested_value": self.config_entry.data.get(CONF_ACCESS_TOKEN, ""),
+                            "description": "Long-lived access token for history API access. "
+                            "Create one at: Profile → Long-Lived Access Tokens. "
+                            "Required for automatic country detection from history."
+                        }
+                    ): str,
                 }
                 return self.async_show_form(
                     step_id="init", data_schema=vol.Schema(schema), errors=errors
@@ -107,6 +119,16 @@ class CountriesVisitedOptionsFlow(config_entries.OptionsFlow):
                 vol.Required(CONF_PERSON, default=self.config_entry.data.get(CONF_PERSON, "")): str,
                 vol.Optional(CONF_MAP_COLOR, default=self.config_entry.data.get(CONF_MAP_COLOR, "#e0e0e0")): str,
                 vol.Optional(CONF_VISITED_COLOR, default=self.config_entry.data.get(CONF_VISITED_COLOR, "#4CAF50")): str,
+                vol.Optional(
+                    CONF_ACCESS_TOKEN,
+                    default=self.config_entry.data.get(CONF_ACCESS_TOKEN, ""),
+                    description={
+                        "suggested_value": self.config_entry.data.get(CONF_ACCESS_TOKEN, ""),
+                        "description": "Long-lived access token for history API access. "
+                        "Create one at: Profile → Long-Lived Access Tokens. "
+                        "Required for automatic country detection from history."
+                    }
+                ): str,
             }
             return self.async_show_form(
                 step_id="init", data_schema=vol.Schema(schema), errors=errors
@@ -121,12 +143,32 @@ class CountriesVisitedOptionsFlow(config_entries.OptionsFlow):
                     vol.In(persons),
                 vol.Optional(CONF_MAP_COLOR, default=self.config_entry.data.get(CONF_MAP_COLOR, "#e0e0e0")): str,
                 vol.Optional(CONF_VISITED_COLOR, default=self.config_entry.data.get(CONF_VISITED_COLOR, "#4CAF50")): str,
+                vol.Optional(
+                    CONF_ACCESS_TOKEN,
+                    default=self.config_entry.data.get(CONF_ACCESS_TOKEN, ""),
+                    description={
+                        "suggested_value": self.config_entry.data.get(CONF_ACCESS_TOKEN, ""),
+                        "description": "Long-lived access token for history API access. "
+                        "Create one at: Profile → Long-Lived Access Tokens. "
+                        "Required for automatic country detection from history."
+                    }
+                ): str,
             }
         else:
             schema = {
                 vol.Required(CONF_PERSON, default=current_person): str,
                 vol.Optional(CONF_MAP_COLOR, default=self.config_entry.data.get(CONF_MAP_COLOR, "#e0e0e0")): str,
                 vol.Optional(CONF_VISITED_COLOR, default=self.config_entry.data.get(CONF_VISITED_COLOR, "#4CAF50")): str,
+                vol.Optional(
+                    CONF_ACCESS_TOKEN,
+                    default=self.config_entry.data.get(CONF_ACCESS_TOKEN, ""),
+                    description={
+                        "suggested_value": self.config_entry.data.get(CONF_ACCESS_TOKEN, ""),
+                        "description": "Long-lived access token for history API access. "
+                        "Create one at: Profile → Long-Lived Access Tokens. "
+                        "Required for automatic country detection from history."
+                    }
+                ): str,
             }
 
         return self.async_show_form(
