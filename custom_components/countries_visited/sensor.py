@@ -337,13 +337,16 @@ class CountriesVisitedSensor(SensorEntity):
             _LOGGER.debug(f"Fetching history for {person_entity} from {start_time} to {end_time}")
             
             # Get significant states for the person entity
-            result = await recorder_history.get_significant_states(
-                self.hass,
-                start_time,
-                end_time,
-                [person_entity],
-                significant_changes_only=False  # Get all states, not just significant changes
-            )
+            def _get_history():
+                return recorder_history.get_significant_states(
+                    self.hass,
+                    start_time,
+                    end_time,
+                    [person_entity],
+                    significant_changes_only=False  # Get all states, not just significant changes
+                )
+            
+            result = await self.hass.async_add_executor_job(_get_history)
             
             if not result or person_entity not in result:
                 _LOGGER.debug(f"No history found for {person_entity}")
