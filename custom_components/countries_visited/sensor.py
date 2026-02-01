@@ -187,6 +187,11 @@ async def async_setup_entry(
     sensor = CountriesVisitedSensor(hass, entry)
     cache_stats_sensor = CacheStatisticsSensor(hass, entry)
     async_add_entities([sensor, cache_stats_sensor])
+    
+    # Trigger initial update to check history immediately
+    # This ensures history is processed on setup/reload
+    await sensor.async_update()
+    await cache_stats_sensor.async_update()
 
     # Listen for person state changes to detect new locations
     @callback
