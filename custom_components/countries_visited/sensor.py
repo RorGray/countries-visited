@@ -314,7 +314,7 @@ class CountriesVisitedSensor(SensorEntity):
         return await get_country_from_coords(self.hass, lat, lon)
 
     async def _detect_countries_from_history(self, person_entity):
-        """Detect countries from person entity history using recorder API."""
+        """Detect countries from person entity history using REST API."""
         detected = set()
         
         try:
@@ -326,9 +326,11 @@ class CountriesVisitedSensor(SensorEntity):
                 )
                 return list(detected)
             
-            # Use recorder history API to get entity history
+            # Use REST API to get entity history (avoids blocking call issues)
             from datetime import datetime, timedelta
-            from homeassistant.components.recorder import history as recorder_history
+            from homeassistant.helpers.aiohttp_client import async_get_clientsession
+            from urllib.parse import quote
+            import json
             
             # Get history from last 365 days
             end_time = datetime.now()
@@ -336,39 +338,85 @@ class CountriesVisitedSensor(SensorEntity):
             
             _LOGGER.debug(f"Fetching history for {person_entity} from {start_time} to {end_time}")
             
-            # Get significant states for the person entity
-            def _get_history():
-                return recorder_history.get_significant_states(
-                    self.hass,
-                    start_time,
-                    end_time,
-                    [person_entity],
-                    significant_changes_only=False  # Get all states, not just significant changes
+            # Format timestamps for API (ISO 8601 format)
+            start_time_str = start_time.isoformat()
+            end_time_str = end_time.isoformat()
+            
+            # Use internal API mechanism to bypass authentication
+            # Call the history API handler directly through hass.http.app
+            from aiohttp import web
+            from homeassistant.components.history import HistoryPeriodView
+            
+            # Build API path with timestamp
+            api_path = f"/api/history/period/{quote(start_time_str)}"
+            
+            # Build query parameters
+            query_params = {
+                "filter_entity_id": person_entity,
+                "end_time": end_time_str,
+            }
+            
+            try:
+                # Create internal request object for the history API handler
+                # This bypasses authentication for internal calls
+                internal_request = web.Request(
+                    method="GET",
+                    path=api_path,
+                    headers={},
+                    match_info={"timestamp": start_time_str},
+                    query=query_params,
                 )
+                
+                # Set the app reference so the handler can access hass
+                internal_request._app = self.hass.http.app
+                
+                # Call the HistoryPeriodView handler directly
+                # This is an internal call that bypasses HTTP authentication
+                handler = HistoryPeriodView()
+                response = await handler.get(internal_request)
+                
+                # Extract JSON from response
+                if response.status == 200:
+                    data = await response.json()
+                else:
+                    _LOGGER.warning(
+                        f"History API returned status {response.status} for {person_entity}"
+                    )
+                    return list(detected)
+                    
+            except Exception as internal_error:
+                _LOGGER.warning(
+                    f"Internal API call failed: {internal_error}. "
+                    "History detection will be skipped. "
+                    "This may require a long-lived access token for REST API calls."
+                )
+                return list(detected)
             
-            result = await self.hass.async_add_executor_job(_get_history)
-            
-            if not result or person_entity not in result:
+            if not data or not isinstance(data, list) or len(data) == 0:
                 _LOGGER.debug(f"No history found for {person_entity}")
                 return list(detected)
             
-            states = result[person_entity]
-            _LOGGER.info(f"Retrieved {len(states)} history states for {person_entity}")
+            # Extract states for our entity (first array in response)
+            entity_states = data[0] if data else []
+            _LOGGER.info(f"Retrieved {len(entity_states)} history states for {person_entity}")
             
             # Extract GPS coordinates from history states
+            # API returns dict objects, not State objects
             coordinates_to_resolve = []
             
-            for state in states:
-                # Check if state has GPS coordinates
-                lat = state.attributes.get("latitude")
-                lon = state.attributes.get("longitude")
+            for state_dict in entity_states:
+                # Check if state has GPS coordinates in attributes
+                attributes = state_dict.get("attributes", {})
+                lat = attributes.get("latitude")
+                lon = attributes.get("longitude")
                 
                 if lat is not None and lon is not None:
                     coordinates_to_resolve.append((lat, lon))
                 
                 # Also check zone information
-                if state.state and state.state.startswith("zone."):
-                    zone_entity = state.state
+                state_value = state_dict.get("state")
+                if state_value and state_value.startswith("zone."):
+                    zone_entity = state_value
                     zone_state = self.hass.states.get(zone_entity)
                     if zone_state:
                         zone_lat = zone_state.attributes.get("latitude")
@@ -412,11 +460,6 @@ class CountriesVisitedSensor(SensorEntity):
                 f"total unique countries: {len(detected)}"
             )
                                 
-        except ImportError as err:
-            _LOGGER.warning(
-                "Could not import recorder history module. "
-                "Make sure recorder component is properly installed: %s", err
-            )
         except Exception as err:
             _LOGGER.warning("Error detecting countries from history: %s", err, exc_info=True)
         
