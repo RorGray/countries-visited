@@ -56,8 +56,17 @@ def _setup_file_logging(hass: HomeAssistant):
             except (AttributeError, OSError):
                 pass
         
+        # Clear the log file on restart by using write mode (truncates existing file)
+        # This prevents the log file from growing indefinitely
+        if os.path.exists(log_file):
+            try:
+                os.remove(log_file)
+            except OSError:
+                pass  # If we can't delete it, the write mode will truncate it anyway
+        
         # Create file handler - DEBUG level (all logs to file)
-        file_handler = logging.FileHandler(log_file, encoding="utf-8", mode="a")
+        # Use "w" mode to truncate the file on each restart
+        file_handler = logging.FileHandler(log_file, encoding="utf-8", mode="w")
         file_handler.setLevel(logging.DEBUG)
         file_handler.setFormatter(formatter)
         root_logger.addHandler(file_handler)

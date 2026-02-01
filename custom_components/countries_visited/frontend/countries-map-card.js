@@ -21,46 +21,100 @@ class CountriesMapCard extends HTMLElement {
     
     // If entity is a person entity, automatically find the corresponding sensor entity
     if (entity && entity.startsWith('person.')) {
+      const personEntity = entity;
+      
       // Find the sensor entity for this person
       // The sensor entity has the person entity ID in its attributes
       const allSensors = Object.keys(this._hass.states)
         .filter(id => id.startsWith('sensor.countries_visited_'))
-        .map(id => ({
-          id,
-          state: this._hass.states[id],
-          person: this._hass.states[id]?.attributes?.person
-        }));
+        .map(id => {
+          const state = this._hass.states[id];
+          return {
+            id,
+            state: state,
+            exists: !!state,
+            person: state?.attributes?.person,
+            hasAttributes: !!state?.attributes,
+            visitedCountries: state?.attributes?.visited_countries || [],
+            stateValue: state?.state,
+            allAttributes: state?.attributes || {}
+          };
+        });
       
       // Try exact match first
-      let sensorEntityId = allSensors.find(s => s.person === entity)?.id;
+      let sensorEntityId = allSensors.find(s => s.person === personEntity)?.id;
+      let matchType = sensorEntityId ? 'exact' : null;
       
       // If not found, try case-insensitive match
       if (!sensorEntityId) {
-        const personLower = entity.toLowerCase();
+        const personLower = personEntity.toLowerCase();
         const match = allSensors.find(s => s.person?.toLowerCase() === personLower);
         if (match) {
           sensorEntityId = match.id;
+          matchType = 'case-insensitive';
         }
       }
       
       if (sensorEntityId) {
         entity = sensorEntityId;
-        console.debug(`Countries Map Card: Found sensor entity ${sensorEntityId} for person ${this._config.entity || this._config.person}`);
+        console.debug(`Countries Map Card: Found sensor entity ${sensorEntityId} for person ${personEntity} (match type: ${matchType})`);
       } else {
-        console.warn(
-          `Countries Map Card: Could not find sensor entity for person ${entity}. ` +
-          `Available sensors: ${allSensors.map(s => `${s.id} (person: ${s.person})`).join(', ') || 'none'}`
-        );
+        // Detailed error logging for debugging
+        const debugInfo = {
+          searchingFor: personEntity,
+          totalSensorsFound: allSensors.length,
+          sensors: allSensors.map(s => ({
+            entityId: s.id,
+            exists: s.exists,
+            personAttribute: s.person,
+            personAttributeType: typeof s.person,
+            personMatches: s.person === personEntity,
+            personMatchesCaseInsensitive: s.person?.toLowerCase() === personEntity.toLowerCase(),
+            hasAttributes: s.hasAttributes,
+            visitedCountriesCount: s.visitedCountries?.length || 0,
+            stateValue: s.stateValue
+          }))
+        };
+        
+        console.error('Countries Map Card: Could not find sensor entity for person', {
+          searchingFor: personEntity,
+          searchType: typeof personEntity,
+          totalSensorsFound: allSensors.length,
+          sensors: debugInfo.sensors,
+          allSensorIds: allSensors.map(s => s.id),
+          allPersonAttributes: allSensors.map(s => ({ id: s.id, person: s.person, type: typeof s.person })),
+          comparison: {
+            exactMatchAttempted: personEntity,
+            caseInsensitiveAttempted: personEntity.toLowerCase(),
+            foundPersonValues: allSensors.map(s => s.person).filter(Boolean)
+          }
+        });
+        
         // Don't proceed if we can't find the sensor entity
+        const errorDetails = allSensors.length > 0 
+          ? `<div style="text-align: left; margin-top: 10px; font-size: 0.9em;">
+              <p><strong>Found ${allSensors.length} sensor(s):</strong></p>
+              <ul style="margin: 5px 0; padding-left: 20px;">
+                ${allSensors.map(s => `
+                  <li>
+                    <code>${s.id}</code><br>
+                    Person attribute: <code>${s.person || '(missing)'}</code> (${typeof s.person})<br>
+                    ${s.person ? `Match: ${s.person === personEntity ? '✓ Exact' : s.person?.toLowerCase() === personEntity.toLowerCase() ? '✓ Case-insensitive' : '✗ No match'}` : 'No person attribute'}
+                  </li>
+                `).join('')}
+              </ul>
+            </div>`
+          : '<p>No sensor entities found. Make sure the Countries Visited integration is installed and configured.</p>';
+        
         this.innerHTML = `
           <div class="countries-card">
             <div class="card-header">
               <div class="card-title">Countries Visited</div>
             </div>
             <div style="padding: 20px; text-align: center; color: #888;">
-              <p>Could not find sensor entity for person: <strong>${entity}</strong></p>
+              <p>Could not find sensor entity for person: <strong>${personEntity}</strong></p>
               <p>Please make sure the Countries Visited integration is configured for this person.</p>
-              ${allSensors.length > 0 ? `<p>Available sensors: ${allSensors.map(s => `${s.id} (person: ${s.person})`).join(', ')}</p>` : ''}
+              ${errorDetails}
             </div>
           </div>
         `;
