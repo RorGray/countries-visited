@@ -150,7 +150,7 @@ class CountriesVisitedSensor(SensorEntity):
         current_country = await self._get_current_country(person_entity)
         
         self._attr_native_value = len(visited_countries)
-        self._attr.extra_state_attributes = {
+        self._attr_extra_state_attributes = {
             "visited_countries": visited_countries,
             "visited_countries_names": country_names,
             "person": person_entity,

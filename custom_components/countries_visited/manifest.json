@@ -1,17 +1,18 @@
 {
   "domain": "countries_visited",
   "name": "Countries Visited",
-  "documentation": "https://github.com/suxarik/ha-countries-visited-plugin",
-  "version": "v0.0.3",
+  "documentation": "https://github.com/RorGray/ha-countries-visited-plugin",
+  "version": "v0.1",
   "requirements": [],
-  "codeowners": ["@suxarik"],
+  "codeowners": ["@RorGray"],
   "config_flow": true,
   "iot_class": "local_polling",
-  "homeassistant": "2024.11.0",
+  "homeassistant": "2021.9.0",
+  "icon": "mdi:earth",
   "frontend": [
     {
       "js_type": "module",
-      "path": "www/community/countries-visited/dist/world-map-full.js",
+      "path": "/local/community/countries-visited/dist/world-map-full.js",
       "dev": false
     }
   ]

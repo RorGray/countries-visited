@@ -121,6 +121,7 @@ class CountriesMapCard extends HTMLElement {
           gap: 4px;
         }
         .map-container {
+          position: relative;
           width: 100%;
           background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
           border-radius: 12px;
@@ -272,7 +273,7 @@ class CountriesMapCard extends HTMLElement {
   }
 
   getWorldMapSVG(countries, visitedCountries, currentCountry) {
-    return `<svg viewBox="0 0 1000 500" preserveAspectRatio="xMidYMid meet">
+    return `<svg viewBox="0 0 1000 666" preserveAspectRatio="xMidYMid meet">
       ${countries.map(c => {
         const isCurrent = currentCountry === c.id;
         const isVisited = visitedCountries.includes(c.id);
@@ -286,3 +287,22 @@ class CountriesMapCard extends HTMLElement {
 }
 
 customElements.define('countries-map-card', CountriesMapCard);
+
+// Register card with Home Assistant's card registry
+if (window.customCards) {
+  window.customCards.push({
+    type: 'countries-map-card',
+    name: 'Countries Visited',
+    description: 'Interactive world map showing visited countries',
+    preview: false,
+    documentationURL: 'https://github.com/RorGray/ha-countries-visited-plugin'
+  });
+}
+
+// Also register with HA's internal registry if available
+if (window.loadCardHelpers) {
+  window.loadCardHelpers().then((helpers) => {
+    // Card helpers are loaded, card should be discoverable
+    console.log('Countries Visited card registered with Home Assistant');
+  });
+}
