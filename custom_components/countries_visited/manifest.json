@@ -4,16 +4,9 @@
   "documentation": "https://github.com/RorGray/ha-countries-visited-plugin",
   "version": "v0.1",
   "requirements": [],
-  "codeowners": ["@RorGray"],
+  "codeowners": ["@suxarik", "@RorGray"],
   "config_flow": true,
   "iot_class": "local_polling",
   "homeassistant": "2021.9.0",
-  "icon": "mdi:earth",
-  "frontend": [
-    {
-      "js_type": "module",
-      "path": "/local/community/countries-visited/dist/world-map-full.js",
-      "dev": false
-    }
-  ]
+  "icon": "mdi:earth"
 }
