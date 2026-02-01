@@ -272,15 +272,20 @@ class CountriesVisitedSensor(SensorEntity):
             self._last_visited_countries = visited_countries
             _LOGGER.info(f"Countries list updated: {visited_countries}")
             
-        # Get country names for display
-        country_names = [
-            ISO_TO_NAME.get(code, code) for code in visited_countries
-        ]
-        
         # Get current location for current country detection
         current_country = await self._get_current_country(person_entity)
         if current_country:
             _LOGGER.debug(f"Current country for {person_entity}: {current_country}")
+            # Add current country to visited list if not already there
+            if current_country not in visited_countries:
+                visited_countries.append(current_country)
+                visited_countries.sort()
+                _LOGGER.info(f"Added current country {current_country} to visited list")
+        
+        # Get country names for display (after adding current country)
+        country_names = [
+            ISO_TO_NAME.get(code, code) for code in visited_countries
+        ]
         
         self._attr_native_value = len(visited_countries)
         self._attr_extra_state_attributes = {
@@ -313,28 +318,106 @@ class CountriesVisitedSensor(SensorEntity):
         detected = set()
         
         try:
-            # Check if history component is available
-            if not hasattr(self.hass, 'components') or not hasattr(self.hass.components, 'history'):
-                _LOGGER.debug("History component not available")
+            # Try multiple methods to access history component
+            history_component = None
+            
+            # Method 1: Direct access via hass.components.history
+            if hasattr(self.hass, 'components') and hasattr(self.hass.components, 'history'):
+                history_component = self.hass.components.history
+                _LOGGER.debug("Accessed history component via hass.components.history")
+            
+            # Method 2: Check if history is in loaded components and try to get it
+            elif 'history' in self.hass.config.components:
+                try:
+                    from homeassistant.components import history as history_module
+                    history_component = history_module
+                    _LOGGER.debug("Accessed history component via import")
+                except ImportError:
+                    _LOGGER.debug("Could not import history component")
+            
+            # Method 3: Try to get from hass.data
+            if history_component is None and 'history' in self.hass.data:
+                try:
+                    history_component = self.hass.data.get('history')
+                    _LOGGER.debug("Accessed history component via hass.data")
+                except Exception:
+                    pass
+            
+            if history_component is None:
+                _LOGGER.warning(
+                    "History component not available. "
+                    "Make sure 'history:' is in your configuration.yaml or history is enabled. "
+                    "History is usually enabled by default."
+                )
                 return list(detected)
             
-            history_component = self.hass.components.history
+            # Try to get history states - use multiple API methods
+            states = []
             
-            # Use async API if available (HA 2022.4+)
+            # Method 1: Try async_get_state (HA 2022.4+)
             if hasattr(history_component, 'async_get_state'):
-                # Newer HA versions (2022.4+)
-                state = await history_component.async_get_state(self.hass, None, person_entity)
-                states = state if state else []
-            else:
-                # Legacy API fallback
                 try:
-                    states = await self.hass.async_add_executor_job(
+                    _LOGGER.debug(f"Using async_get_state API for {person_entity}")
+                    result = await history_component.async_get_state(self.hass, None, person_entity)
+                    if result:
+                        # async_get_state returns a dict with entity_id as key
+                        if isinstance(result, dict):
+                            states = result.get(person_entity, [])
+                        elif isinstance(result, list):
+                            states = result
+                        else:
+                            states = []
+                    _LOGGER.debug(f"Retrieved {len(states)} history states via async_get_state")
+                except Exception as e:
+                    _LOGGER.debug(f"async_get_state failed: {e}, trying fallback")
+            
+            # Method 2: Try get_state (legacy API)
+            if not states and hasattr(history_component, 'get_state'):
+                try:
+                    _LOGGER.debug(f"Using get_state API for {person_entity}")
+                    result = await self.hass.async_add_executor_job(
                         lambda: history_component.get_state(self.hass, None, person_entity)
                     )
-                    states = states.get(person_entity, []) if states else []
-                except Exception:
-                    _LOGGER.debug("Could not fetch history")
-                    return list(detected)
+                    if result:
+                        if isinstance(result, dict):
+                            states = result.get(person_entity, [])
+                        elif isinstance(result, list):
+                            states = result
+                        else:
+                            states = []
+                    _LOGGER.debug(f"Retrieved {len(states)} history states via get_state")
+                except Exception as e:
+                    _LOGGER.debug(f"get_state failed: {e}")
+            
+            # Method 3: Try using recorder API directly via hass
+            if not states and 'recorder' in self.hass.config.components:
+                try:
+                    from datetime import datetime, timedelta
+                    _LOGGER.debug(f"Trying recorder API for {person_entity}")
+                    # Get history from last 365 days
+                    end_time = datetime.now()
+                    start_time = end_time - timedelta(days=365)
+                    
+                    # Try to get from recorder component
+                    if hasattr(self.hass.components, 'recorder'):
+                        recorder = self.hass.components.recorder
+                        if hasattr(recorder, 'history'):
+                            result = await recorder.history.get_significant_states(
+                                self.hass,
+                                start_time,
+                                end_time,
+                                [person_entity],
+                                significant_changes_only=False
+                            )
+                            if result and person_entity in result:
+                                states = result[person_entity]
+                                _LOGGER.debug(f"Retrieved {len(states)} history states via recorder")
+                except Exception as e:
+                    _LOGGER.debug(f"recorder API failed: {e}")
+            
+            if not states:
+                _LOGGER.warning(f"Could not retrieve history for {person_entity} using any method")
+                return list(detected)
             
             # Process states in batches to avoid too many API calls
             coordinates_to_resolve = []
