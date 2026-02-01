@@ -3,8 +3,6 @@
 ![GitHub release (latest by date)](https://img.shields.io/github/v/release/RorGray/ha-countries-visited-plugin)
 ![HACS validated](https://img.shields.io/badge/HACS-Default-orange)
 
-This project is based on [suxarik/ha-countries-visited-plugin](https://github.com/suxarik/ha-countries-visited-plugin).
-
 A Home Assistant integration to track and visualize countries visited by family members on an interactive world map.
 
 ## Features
@@ -42,16 +40,16 @@ A Home Assistant integration to track and visualize countries visited by family 
 
 ## Lovelace Card
 
-Add the resource first:
+The JavaScript file is loaded automatically via the integration's frontend configuration. If the card doesn't appear, you may need to add it as a resource manually:
 
 **Configuration** → **Lovelace Dashboards** → **Resources** → **+ Add Resource**
 
 ```
-URL: /local/community/countries-visited/dist/countries-visited.js
+URL: /local/community/countries-visited/dist/world-map-full.js
 Resource type: JavaScript Module
 ```
 
-Then add the card to your dashboard:
+Add the card to your dashboard:
 
 ```yaml
 type: custom:countries-map-card
@@ -155,9 +153,17 @@ title: Bob's Travels
 4. Push to the branch
 5. Open a Pull Request
 
+## Credits
+
+This project uses the following open-source resources:
+
+- **Base Project**: Based on [suxarik/ha-countries-visited-plugin](https://github.com/suxarik/ha-countries-visited-plugin) (MIT License)
+- **World Map**: World vector map from [mapsvg.com](https://mapsvg.com). Any use, including commercial, is allowed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+- **Country Data**: Country information from [raphaellepuschitz/SVG-World-Map](https://github.com/raphaellepuschitz/SVG-World-Map/) (MIT License)
+
 ## License
 
-MIT License - see LICENSE file for details
+This project is licensed under the [MIT License](https://opensource.org/license/MIT).
 
 ## Support
 
