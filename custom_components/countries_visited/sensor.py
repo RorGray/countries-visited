@@ -12,7 +12,8 @@ from homeassistant.helpers import event
 
 from .const import CONF_PERSON, DOMAIN, ISO_TO_NAME
 
-_LOGGER = logging.getLogger(__name__)
+# Use consistent logger name for easy filtering
+_LOGGER = logging.getLogger(f"custom_components.{DOMAIN}.sensor")
 
 # Callbacks for cache statistics sensors to update
 _cache_stats_callbacks = []

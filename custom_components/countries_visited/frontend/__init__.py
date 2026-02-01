@@ -8,7 +8,8 @@ from homeassistant.components.http import StaticPathConfig
 
 from ..const import URL_BASE, COUNTRIES_VISITED_CARDS, DOMAIN
 
-_LOGGER = logging.getLogger(__name__)
+# Use consistent logger name for easy filtering
+_LOGGER = logging.getLogger(f"custom_components.{DOMAIN}.frontend")
 
 
 class CountriesVisitedCardRegistration:

@@ -9,7 +9,8 @@ from homeassistant.helpers import config_validation as cv
 
 from .const import CONF_MAP_COLOR, CONF_PERSON, CONF_VISITED_COLOR, DOMAIN
 
-_LOGGER = logging.getLogger(__name__)
+# Use consistent logger name for easy filtering
+_LOGGER = logging.getLogger(f"custom_components.{DOMAIN}.config_flow")
 
 
 def get_person_entities(hass):

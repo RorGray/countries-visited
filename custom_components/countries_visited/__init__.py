@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 import os
 import shutil
+from pathlib import Path
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -13,7 +14,49 @@ from .const import DOMAIN, PLATFORMS
 from .frontend import CountriesVisitedCardRegistration
 from .services import register_services
 
-_LOGGER = logging.getLogger(__name__)
+# Configure logger with a clear name for easy filtering
+_LOGGER = logging.getLogger(f"custom_components.{DOMAIN}")
+
+# Optional: Set up a file handler for separate log file (if desired)
+# This creates a log file at: <config>/countries_visited.log
+_log_file_handler = None
+
+
+def _setup_file_logging(hass: HomeAssistant):
+    """Set up optional file logging for Countries Visited."""
+    global _log_file_handler
+    
+    try:
+        log_file = hass.config.path("countries_visited.log")
+        
+        # Create file handler
+        file_handler = logging.FileHandler(log_file, encoding="utf-8")
+        file_handler.setLevel(logging.DEBUG)
+        
+        # Create formatter
+        formatter = logging.Formatter(
+            "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S"
+        )
+        file_handler.setFormatter(formatter)
+        
+        # Add handler to logger
+        _LOGGER.addHandler(file_handler)
+        _log_file_handler = file_handler
+        
+        _LOGGER.info(f"Countries Visited logging to file: {log_file}")
+    except Exception as e:
+        # Don't fail setup if logging can't be configured
+        logging.getLogger(__name__).warning(f"Could not set up file logging: {e}")
+
+
+def _remove_file_logging():
+    """Remove file logging handler."""
+    global _log_file_handler
+    if _log_file_handler:
+        _LOGGER.removeHandler(_log_file_handler)
+        _log_file_handler.close()
+        _log_file_handler = None
 
 
 def ensure_directory(hass: HomeAssistant):
@@ -51,6 +94,9 @@ def copy_frontend_files(hass: HomeAssistant):
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up a skeleton component."""
     _LOGGER.info("Setting up Countries Visited integration (global setup)")
+    
+    # Set up optional file logging
+    await hass.async_add_executor_job(_setup_file_logging, hass)
 
     # Ensure frontend files exist on every Home Assistant startup
     await hass.async_add_executor_job(ensure_directory, hass)
