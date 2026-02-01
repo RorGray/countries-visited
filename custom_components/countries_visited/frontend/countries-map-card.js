@@ -197,6 +197,7 @@ if (window.customCards) {
     name: 'Countries Visited',
     description: 'Interactive world map showing visited countries',
     preview: false,
+    icon: '/hacsfiles/countries-visited/icon.svg',
     documentationURL: 'https://github.com/RorGray/countries-visited'
   });
 }

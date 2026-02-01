@@ -107,6 +107,13 @@ def copy_frontend_files(hass: HomeAssistant):
     """Copy frontend files synchronously from the integration folder to the www folder."""
     frontend_source = hass.config.path("custom_components/countries_visited/frontend")
     frontend_dest = hass.config.path("www/community/countries-visited")
+    
+    # Path to icon files in repository root (relative to config directory)
+    # When installed via HACS, the repo root is at custom_components/countries_visited/
+    # So we need to go up two levels to find icon files
+    repo_root = Path(frontend_source).parent.parent.parent
+    icon_svg = repo_root / "icon.svg"
+    icon_png = repo_root / "icon.png"
 
     try:
         if not os.path.exists(frontend_source):
@@ -119,6 +126,17 @@ def copy_frontend_files(hass: HomeAssistant):
 
         shutil.copytree(frontend_source, frontend_dest)
         _LOGGER.info(f"Copied frontend files from {frontend_source} to {frontend_dest}")
+        
+        # Copy icon files if they exist in the repository root
+        try:
+            if icon_svg.exists():
+                shutil.copy2(icon_svg, frontend_dest / "icon.svg")
+                _LOGGER.debug("Copied icon.svg to frontend directory")
+            if icon_png.exists():
+                shutil.copy2(icon_png, frontend_dest / "icon.png")
+                _LOGGER.debug("Copied icon.png to frontend directory")
+        except Exception as icon_error:
+            _LOGGER.debug(f"Could not copy icon files: {icon_error}")
 
         return True
     except Exception as e:

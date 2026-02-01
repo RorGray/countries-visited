@@ -5,5 +5,6 @@
   "categories": ["plugin"],
   "homeassistant": "2021.9.0",
   "render_readme": true,
-  "issues": "https://github.com/RorGray/countries-visited/issues"
+  "issues": "https://github.com/RorGray/countries-visited/issues",
+  "icon": "icon.svg"
 }
