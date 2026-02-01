@@ -30,6 +30,7 @@ function logVersion() {
 
 // Track if we've already logged sensor finding errors to avoid spam
 let _sensorErrorLogged = new Set();
+let _sensorErrorThrown = new Set(); // Track thrown errors to prevent duplicates
 let _versionLogged = false;
 
 // CSS loading state (module-level, shared across all card instances)
@@ -41,8 +42,8 @@ let _cssLoadPromise = null;
 function loadCardCSS() {
   // If already loaded, return immediately
   if (_cssLoaded) {
-    const existingLink = document.getElementById('countries-map-card-styles');
-    if (existingLink && existingLink.sheet) {
+    const existingStyle = document.getElementById('countries-map-card-styles');
+    if (existingStyle) {
       return Promise.resolve();
     }
   }
@@ -52,42 +53,11 @@ function loadCardCSS() {
     return _cssLoadPromise;
   }
   
-  // Check if link already exists in DOM
-  const existingLink = document.getElementById('countries-map-card-styles');
-  if (existingLink) {
-    if (existingLink.sheet) {
-      _cssLoaded = true;
-      return Promise.resolve();
-    }
-    // Link exists but not loaded yet - wait for it
-    _cssLoading = true;
-    _cssLoadPromise = new Promise((resolve) => {
-      existingLink.onload = () => {
-        _cssLoaded = true;
-        _cssLoading = false;
-        _cssLoadPromise = null;
-        resolve();
-      };
-      existingLink.onerror = () => {
-        _cssLoading = false;
-        _cssLoadPromise = null;
-        resolve(); // Continue anyway
-      };
-    });
-    return _cssLoadPromise;
-  }
-  
   // Start loading
   _cssLoading = true;
   
-  _cssLoadPromise = new Promise((resolve, reject) => {
-    const link = document.createElement('link');
-    link.id = 'countries-map-card-styles';
-    link.rel = 'stylesheet';
-    link.type = 'text/css';
-    
+  _cssLoadPromise = new Promise(async (resolve, reject) => {
     // Try HACS path first, then module-relative fallback
-    // Add version to prevent caching
     const moduleBaseUrl = new URL('.', import.meta.url);
     const cssUrl = new URL('countries-map-card.css', moduleBaseUrl);
     const cssPaths = [
@@ -95,46 +65,50 @@ function loadCardCSS() {
       `${cssUrl.href}?v=${CARD_VERSION}`
     ];
     
-    let currentPathIndex = 0;
-    let timeoutId = null;
+    let cssText = null;
+    let lastError = null;
     
-    const tryLoad = (pathIndex) => {
-      if (pathIndex >= cssPaths.length) {
-        if (timeoutId) clearTimeout(timeoutId);
-        _cssLoading = false;
-        _cssLoadPromise = null;
-        reject(new Error('Failed to load CSS from all paths'));
-        return;
-      }
-      
-      link.href = cssPaths[pathIndex];
-      
-      timeoutId = setTimeout(() => {
-        if (pathIndex < cssPaths.length - 1) {
-          tryLoad(pathIndex + 1);
+    // Try each path until one succeeds
+    for (const path of cssPaths) {
+      try {
+        const response = await fetch(path);
+        if (response.ok) {
+          cssText = await response.text();
+          break; // Success, exit loop
         } else {
-          _cssLoading = false;
-          _cssLoadPromise = null;
-          reject(new Error('CSS loading timeout'));
+          lastError = `Status ${response.status} from ${path}`;
         }
-      }, 5000);
-      
-      link.onload = () => {
-        if (timeoutId) clearTimeout(timeoutId);
-        _cssLoaded = true;
-        _cssLoading = false;
-        _cssLoadPromise = null;
-        resolve();
-      };
-      
-      link.onerror = () => {
-        if (timeoutId) clearTimeout(timeoutId);
-        tryLoad(pathIndex + 1);
-      };
-    };
+      } catch (error) {
+        lastError = `Error loading ${path}: ${error.message}`;
+        continue; // Try next path
+      }
+    }
     
-    document.head.appendChild(link);
-    tryLoad(0);
+    if (!cssText) {
+      _cssLoading = false;
+      _cssLoadPromise = null;
+      reject(new Error(`Failed to load CSS from all paths. Last error: ${lastError}`));
+      return;
+    }
+    
+    // Check if style tag already exists (shouldn't happen, but be safe)
+    let styleTag = document.getElementById('countries-map-card-styles');
+    if (!styleTag) {
+      // Create and inject style tag
+      styleTag = document.createElement('style');
+      styleTag.id = 'countries-map-card-styles';
+      styleTag.type = 'text/css';
+      styleTag.textContent = cssText;
+      document.head.appendChild(styleTag);
+    } else {
+      // Update existing style tag
+      styleTag.textContent = cssText;
+    }
+    
+    _cssLoaded = true;
+    _cssLoading = false;
+    _cssLoadPromise = null;
+    resolve();
   });
   
   return _cssLoadPromise;
@@ -331,16 +305,34 @@ class CountriesMapCard extends HTMLElement {
           });
         }
         
-        // Throw error so Home Assistant displays it properly
-        // This is better than showing custom HTML, especially during startup
-        const availableSensors = allSensors.length > 0
-          ? `\n\nAvailable sensors:\n${allSensors.map(s => `  - ${s.id} (person: ${s.person || 'none'})`).join('\n')}`
-          : '\n\nNo sensor entities found. Make sure the Countries Visited integration is installed and configured.';
+        // Only throw error once per person entity to prevent console spam
+        // Show a user-friendly message in the card instead of throwing repeatedly
+        if (!_sensorErrorThrown.has(errorKey)) {
+          _sensorErrorThrown.add(errorKey);
+          
+          // Short, user-friendly error message
+          const sensorCount = allSensors.length;
+          const errorMsg = sensorCount > 0
+            ? `Could not find sensor for person: ${personEntity}. Found ${sensorCount} sensor(s), but none match this person. Please check the integration configuration.`
+            : `Could not find sensor for person: ${personEntity}. No sensor entities found. Please install and configure the Countries Visited integration.`;
+          
+          throw new Error(errorMsg);
+        }
         
-        throw new Error(
-          `Could not find sensor entity for person: ${personEntity}. ` +
-          `Please make sure the Countries Visited integration is configured for this person.${availableSensors}`
-        );
+        // If error was already thrown, show a simple message in the card instead
+        this.innerHTML = `
+          <div class="countries-card">
+            <div class="card-header">
+              <div class="card-title">Countries Visited</div>
+            </div>
+            <div style="padding: 20px; text-align: center; color: #888;">
+              <p><strong>Sensor not found</strong></p>
+              <p>Could not find sensor entity for person: <code>${personEntity}</code></p>
+              <p style="font-size: 0.9em; margin-top: 10px;">Please configure the Countries Visited integration for this person.</p>
+            </div>
+          </div>
+        `;
+        return;
       }
     }
     
