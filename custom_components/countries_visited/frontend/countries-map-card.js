@@ -9,7 +9,7 @@ async function loadMapDataModule() {
     `/hacsfiles/countries-visited/map-data.js?v=${CARD_VERSION}`,
     `${mapDataUrl.href}?v=${CARD_VERSION}`
   ];
-  
+
   // Try each path until one succeeds
   for (const path of mapDataPaths) {
     try {
@@ -20,7 +20,7 @@ async function loadMapDataModule() {
       continue;
     }
   }
-  
+
   // Fallback to relative import without version (for development)
   return import('./map-data.js');
 }
@@ -67,15 +67,15 @@ function loadCardCSS() {
   if (_cssLoaded && _cssText) {
     return Promise.resolve(_cssText);
   }
-  
+
   // If currently loading, return the existing promise
   if (_cssLoading && _cssLoadPromise) {
     return _cssLoadPromise;
   }
-  
+
   // Start loading
   _cssLoading = true;
-  
+
   _cssLoadPromise = new Promise(async (resolve, reject) => {
     // Try HACS path first, then module-relative fallback
     const moduleBaseUrl = new URL('.', import.meta.url);
@@ -84,10 +84,10 @@ function loadCardCSS() {
       `/hacsfiles/countries-visited/countries-map-card.css?v=${CARD_VERSION}`,
       `${cssUrl.href}?v=${CARD_VERSION}`
     ];
-    
+
     let cssText = null;
     let lastError = null;
-    
+
     // Try each path until one succeeds
     for (const path of cssPaths) {
       try {
@@ -103,14 +103,14 @@ function loadCardCSS() {
         continue; // Try next path
       }
     }
-    
+
     if (!cssText) {
       _cssLoading = false;
       _cssLoadPromise = null;
       reject(new Error(`Failed to load CSS from all paths. Last error: ${lastError}`));
       return;
     }
-    
+
     // Store CSS text for reuse
     _cssText = cssText;
     _cssLoaded = true;
@@ -118,7 +118,7 @@ function loadCardCSS() {
     _cssLoadPromise = null;
     resolve(cssText);
   });
-  
+
   return _cssLoadPromise;
 }
 
@@ -143,13 +143,13 @@ class CountriesMapCard extends HTMLElement {
   setConfig(config) {
     const configChanged = JSON.stringify(this._lastConfig) !== JSON.stringify(config);
     this._config = config;
-    
+
     // Log version on first config set
     if (!_versionLogged) {
       logVersion();
       _versionLogged = true;
     }
-    
+
     // If config changed, force a render
     if (configChanged) {
       this._lastConfig = JSON.parse(JSON.stringify(config));
@@ -165,9 +165,9 @@ class CountriesMapCard extends HTMLElement {
 
   _shouldUpdate() {
     if (!this._config || !this._hass) return false;
-    
+
     let entity = this._config.entity || this._config.person;
-    
+
     // If entity is a person entity, find the sensor entity
     if (entity && entity.startsWith('person.')) {
       const personEntity = entity;
@@ -180,10 +180,10 @@ class CountriesMapCard extends HTMLElement {
             person: state?.attributes?.person,
           };
         });
-      
+
       const sensorEntityId = allSensors.find(s => s.person === personEntity)?.id ||
         allSensors.find(s => s.person?.toLowerCase() === personEntity.toLowerCase())?.id;
-      
+
       if (sensorEntityId) {
         entity = sensorEntityId;
       } else {
@@ -191,14 +191,14 @@ class CountriesMapCard extends HTMLElement {
         return !this._lastState;
       }
     }
-    
+
     const stateObj = this._hass.states[entity];
     if (!stateObj) return false;
-    
+
     const visitedCountries = stateObj?.attributes?.visited_countries || [];
     const currentCountry = stateObj?.attributes?.current_country || null;
     const stateValue = stateObj?.state;
-    
+
     // Create current state signature
     const currentState = {
       visitedCountries: JSON.stringify(visitedCountries.sort()),
@@ -206,25 +206,25 @@ class CountriesMapCard extends HTMLElement {
       stateValue: stateValue,
       entity: entity
     };
-    
+
     // Compare with last state
     if (!this._lastState) {
       this._lastState = currentState;
       return true; // First render
     }
-    
+
     // Check if anything relevant changed
-    const hasChanged = 
+    const hasChanged =
       this._lastState.visitedCountries !== currentState.visitedCountries ||
       this._lastState.currentCountry !== currentState.currentCountry ||
       this._lastState.stateValue !== currentState.stateValue ||
       this._lastState.entity !== currentState.entity;
-    
+
     if (hasChanged) {
       this._lastState = currentState;
       return true;
     }
-    
+
     return false; // No relevant changes, skip render
   }
 
@@ -249,11 +249,11 @@ class CountriesMapCard extends HTMLElement {
     }
 
     let entity = this._config.entity || this._config.person;
-    
+
     // If entity is a person entity, automatically find the corresponding sensor entity
     if (entity && entity.startsWith('person.')) {
       const personEntity = entity;
-      
+
       // Find the sensor entity for this person
       // The sensor entity has the person entity ID in its attributes
       const allSensors = Object.keys(this._hass.states)
@@ -271,11 +271,11 @@ class CountriesMapCard extends HTMLElement {
             allAttributes: state?.attributes || {}
           };
         });
-      
+
       // Try exact match first
       let sensorEntityId = allSensors.find(s => s.person === personEntity)?.id;
       let matchType = sensorEntityId ? 'exact' : null;
-      
+
       // If not found, try case-insensitive match
       if (!sensorEntityId) {
         const personLower = personEntity.toLowerCase();
@@ -285,7 +285,7 @@ class CountriesMapCard extends HTMLElement {
           matchType = 'case-insensitive';
         }
       }
-      
+
       if (sensorEntityId) {
         entity = sensorEntityId;
         // Don't log successful finds - too verbose on every render
@@ -298,7 +298,7 @@ class CountriesMapCard extends HTMLElement {
         const errorKey = `sensor_error_${personEntity}`;
         if (!_sensorErrorLogged.has(errorKey)) {
           _sensorErrorLogged.add(errorKey);
-          
+
           // Detailed error logging for debugging (only once)
           const debugInfo = {
             searchingFor: personEntity,
@@ -315,7 +315,7 @@ class CountriesMapCard extends HTMLElement {
               stateValue: s.stateValue
             }))
           };
-          
+
           logError('Could not find sensor entity for person', {
             searchingFor: personEntity,
             totalSensorsFound: allSensors.length,
@@ -323,26 +323,26 @@ class CountriesMapCard extends HTMLElement {
             debug: debugInfo
           });
         }
-        
+
         // Only throw error once per person entity to prevent console spam
         // Show a user-friendly message in the card instead of throwing repeatedly
         if (!_sensorErrorThrown.has(errorKey)) {
           _sensorErrorThrown.add(errorKey);
-          
+
           // Short, user-friendly error message
           const sensorCount = allSensors.length;
           const errorMsg = sensorCount > 0
             ? `Could not find sensor for person: ${personEntity}. Found ${sensorCount} sensor(s), but none match this person. Please check the integration configuration.`
             : `Could not find sensor for person: ${personEntity}. No sensor entities found. Please install and configure the Countries Visited integration.`;
-          
+
           throw new Error(errorMsg);
         }
-        
+
         // If error was already thrown, show a simple message in the card instead
         // Preserve the style tag when setting innerHTML
         const existingStyleTag = this.querySelector('style');
         const styleTagContent = existingStyleTag ? existingStyleTag.outerHTML : '';
-        
+
         this.innerHTML = styleTagContent + `
           <div class="countries-card">
             <div class="card-header">
@@ -358,19 +358,19 @@ class CountriesMapCard extends HTMLElement {
         return;
       }
     }
-    
+
     const visitedColor = this._config.visited_color || '#4CAF50';
     const mapColor = this._config.map_color || '#d0d0d0';
     const currentColor = this._config.current_color || '#FF5722';
     const title = this._config.title || 'Countries Visited';
-    
+
     const stateObj = this._hass.states[entity];
-    
+
     // If entity doesn't exist, throw error for Home Assistant to display
     if (!stateObj) {
       throw new Error(`Entity ${entity} not found. Make sure the Countries Visited integration is configured.`);
     }
-    
+
     const visitedCountries = stateObj?.attributes?.visited_countries || [];
     const currentCountry = stateObj?.attributes?.current_country || null;
 
@@ -416,9 +416,9 @@ class CountriesMapCard extends HTMLElement {
         </div>
       </div>
     `;
-    
+
     this._setupTooltips();
-    
+
     // Update last state after rendering to track what was rendered
     if (stateObj) {
       this._lastState = {
@@ -442,20 +442,20 @@ class CountriesMapCard extends HTMLElement {
     const container = this.querySelector('#map-container');
     const tooltip = this.querySelector('#tooltip');
     if (!container || !tooltip) return;
-    
+
     const visitedColor = this._config.visited_color || '#4CAF50';
     const currentColor = this._config.current_color || '#FF5722';
-    
+
     container.querySelectorAll('.country').forEach(country => {
       const originalFill = country.getAttribute('fill');
       const isCurrent = country.classList.contains('current');
       const isVisited = country.classList.contains('visited');
-      
+
       country.addEventListener('mouseenter', () => {
         const name = country.getAttribute('title') || country.id;
         tooltip.textContent = isCurrent ? `${name} (Current)` : isVisited ? `${name} (Visited)` : name;
         tooltip.classList.add('visible');
-        
+
         // Darken color on hover
         if (isCurrent) {
           country.setAttribute('fill', this._adjustColor(currentColor, -15));
@@ -463,13 +463,13 @@ class CountriesMapCard extends HTMLElement {
           country.setAttribute('fill', this._adjustColor(visitedColor, -15));
         }
       });
-      
+
       country.addEventListener('mousemove', (e) => {
         const rect = container.getBoundingClientRect();
         tooltip.style.left = (e.clientX - rect.left) + 'px';
         tooltip.style.top = (e.clientY - rect.top) + 'px';
       });
-      
+
       country.addEventListener('mouseleave', () => {
         tooltip.classList.remove('visible');
         // Restore original color
@@ -481,25 +481,25 @@ class CountriesMapCard extends HTMLElement {
   getWorldMapSVG(countries, visitedCountries, currentCountry, mapColor, visitedColor, currentColor) {
     return `<svg viewBox="0 0 1000 666" preserveAspectRatio="xMidYMid meet">
       ${countries.map(c => {
-        const isCurrent = currentCountry === c.id;
-        const isVisited = visitedCountries.includes(c.id);
-        let cls = 'country';
-        let fill = mapColor;
-        let stroke = 'var(--card-background-color, #fff)';
-        let strokeWidth = '0.5';
-        
-        if (isCurrent) {
-          cls += ' current';
-          fill = currentColor;
-          stroke = currentColor;
-          strokeWidth = '2';
-        } else if (isVisited) {
-          cls += ' visited';
-          fill = visitedColor;
-        }
-        
-        return `<path id="${c.id}" class="${cls}" d="${c.d}" title="${c.name}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"/>`;
-      }).join('')}
+      const isCurrent = currentCountry === c.id;
+      const isVisited = visitedCountries.includes(c.id);
+      let cls = 'country';
+      let fill = mapColor;
+      let stroke = 'var(--card-background-color, #fff)';
+      let strokeWidth = '0.5';
+
+      if (isCurrent) {
+        cls += ' current';
+        fill = currentColor;
+        stroke = currentColor;
+        strokeWidth = '2';
+      } else if (isVisited) {
+        cls += ' visited';
+        fill = visitedColor;
+      }
+
+      return `<path id="${c.id}" class="${cls}" d="${c.d}" title="${c.name}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"/>`;
+    }).join('')}
     </svg>`;
   }
 }

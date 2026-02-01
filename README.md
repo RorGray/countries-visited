@@ -21,7 +21,7 @@ A Home Assistant integration to track and visualize countries visited by family 
 
 ## Installation
 
-### HACS (Recommended)
+### HACS
 
 1. Add this repository to HACS:
    - Go to **HACS** → **Integrations** → **⋮** → **Add custom repository**
@@ -49,14 +49,7 @@ A Home Assistant integration to track and visualize countries visited by family 
 
 ## Lovelace Card
 
-The JavaScript file is loaded automatically via the integration's frontend configuration. If the card doesn't appear, you may need to add it as a resource manually:
-
-**Configuration** → **Lovelace Dashboards** → **Resources** → **+ Add Resource**
-
-```
-URL: /local/community/countries-visited/dist/world-map-full.js
-Resource type: JavaScript Module
-```
+The JavaScript file is loaded automatically via the integration's frontend configuration.
 
 Add the card to your dashboard:
 
@@ -175,11 +168,8 @@ The integration uses **reverse geocoding** to convert GPS coordinates (latitude/
    - Device tracker history states
    - Zone coordinates when a person enters a zone
    - Current location from person entity attributes
-
 2. Coordinates are rounded to ~1km precision for efficient caching
-
 3. Each unique coordinate is reverse geocoded to determine the country code
-
 4. Results are cached to avoid redundant API calls
 
 ### Setting up automatic tracking
@@ -189,13 +179,9 @@ The integration uses **reverse geocoding** to convert GPS coordinates (latitude/
    - Give it a name (e.g., "Countries Visited")
    - Copy the token
    - Add it in the integration settings: **Settings** → **Devices & Services** → **Countries Visited** → **Configure** → **Access Token**
-
 2. Ensure your person entities have GPS coordinates (latitude/longitude attributes)
-
 3. The integration will automatically process history and detect countries
-
 4. Country codes are resolved from coordinates using reverse geocoding
-
 5. Results are cached for future use
 
 **Note**: 
