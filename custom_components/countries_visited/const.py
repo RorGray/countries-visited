@@ -18,12 +18,12 @@ COUNTRIES_VISITED_CARDS = [
     {
         "name": "Countries Map Data",
         "filename": "map-data.js",
-        "version": "0.1.0",
+        "version": "0.1",
     },
     {
         "name": "Countries Map Card",
         "filename": "countries-map-card.js",
-        "version": "0.1.0",
+        "version": "0.1",
     }
 ]
 

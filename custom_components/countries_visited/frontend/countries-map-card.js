@@ -32,13 +32,131 @@ function logVersion() {
 let _sensorErrorLogged = new Set();
 let _versionLogged = false;
 
+// CSS loading state (module-level, shared across all card instances)
+let _cssLoading = false;
+let _cssLoaded = false;
+let _cssLoadPromise = null;
+
+// Module-level CSS loading function (shared across all card instances)
+function loadCardCSS() {
+  // If already loaded, return immediately
+  if (_cssLoaded) {
+    const existingLink = document.getElementById('countries-map-card-styles');
+    if (existingLink && existingLink.sheet) {
+      return Promise.resolve();
+    }
+  }
+  
+  // If currently loading, return the existing promise
+  if (_cssLoading && _cssLoadPromise) {
+    return _cssLoadPromise;
+  }
+  
+  // Check if link already exists in DOM
+  const existingLink = document.getElementById('countries-map-card-styles');
+  if (existingLink) {
+    if (existingLink.sheet) {
+      _cssLoaded = true;
+      return Promise.resolve();
+    }
+    // Link exists but not loaded yet - wait for it
+    _cssLoading = true;
+    _cssLoadPromise = new Promise((resolve) => {
+      existingLink.onload = () => {
+        _cssLoaded = true;
+        _cssLoading = false;
+        _cssLoadPromise = null;
+        resolve();
+      };
+      existingLink.onerror = () => {
+        _cssLoading = false;
+        _cssLoadPromise = null;
+        resolve(); // Continue anyway
+      };
+    });
+    return _cssLoadPromise;
+  }
+  
+  // Start loading
+  _cssLoading = true;
+  
+  _cssLoadPromise = new Promise((resolve, reject) => {
+    const link = document.createElement('link');
+    link.id = 'countries-map-card-styles';
+    link.rel = 'stylesheet';
+    link.type = 'text/css';
+    
+    // Try HACS path first, then module-relative fallback
+    const moduleBaseUrl = new URL('.', import.meta.url);
+    const cssUrl = new URL('countries-map-card.css', moduleBaseUrl);
+    const cssPaths = [
+      '/hacsfiles/countries-visited/countries-map-card.css',
+      cssUrl.href
+    ];
+    
+    let currentPathIndex = 0;
+    let timeoutId = null;
+    
+    const tryLoad = (pathIndex) => {
+      if (pathIndex >= cssPaths.length) {
+        if (timeoutId) clearTimeout(timeoutId);
+        _cssLoading = false;
+        _cssLoadPromise = null;
+        reject(new Error('Failed to load CSS from all paths'));
+        return;
+      }
+      
+      link.href = cssPaths[pathIndex];
+      
+      timeoutId = setTimeout(() => {
+        if (pathIndex < cssPaths.length - 1) {
+          tryLoad(pathIndex + 1);
+        } else {
+          _cssLoading = false;
+          _cssLoadPromise = null;
+          reject(new Error('CSS loading timeout'));
+        }
+      }, 5000);
+      
+      link.onload = () => {
+        if (timeoutId) clearTimeout(timeoutId);
+        _cssLoaded = true;
+        _cssLoading = false;
+        _cssLoadPromise = null;
+        resolve();
+      };
+      
+      link.onerror = () => {
+        if (timeoutId) clearTimeout(timeoutId);
+        tryLoad(pathIndex + 1);
+      };
+    };
+    
+    document.head.appendChild(link);
+    tryLoad(0);
+  });
+  
+  return _cssLoadPromise;
+}
+
 class CountriesMapCard extends HTMLElement {
+  constructor() {
+    super();
+    // Store last rendered state to detect changes
+    this._lastState = null;
+    this._lastConfig = null;
+  }
+
   set hass(hass) {
     this._hass = hass;
-    this.render();
+    // Only render if relevant data has changed
+    if (this._shouldUpdate()) {
+      this.render();
+    }
   }
 
   setConfig(config) {
+    const configChanged = JSON.stringify(this._lastConfig) !== JSON.stringify(config);
     this._config = config;
     
     // Log version on first config set
@@ -46,10 +164,83 @@ class CountriesMapCard extends HTMLElement {
       logVersion();
       _versionLogged = true;
     }
+    
+    // If config changed, force a render
+    if (configChanged) {
+      this._lastConfig = JSON.parse(JSON.stringify(config));
+      if (this._hass) {
+        this.render();
+      }
+    }
   }
 
   getConfig() {
     return this._config;
+  }
+
+  _shouldUpdate() {
+    if (!this._config || !this._hass) return false;
+    
+    let entity = this._config.entity || this._config.person;
+    
+    // If entity is a person entity, find the sensor entity
+    if (entity && entity.startsWith('person.')) {
+      const personEntity = entity;
+      const allSensors = Object.keys(this._hass.states)
+        .filter(id => id.startsWith('sensor.countries_visited_'))
+        .map(id => {
+          const state = this._hass.states[id];
+          return {
+            id,
+            person: state?.attributes?.person,
+          };
+        });
+      
+      const sensorEntityId = allSensors.find(s => s.person === personEntity)?.id ||
+        allSensors.find(s => s.person?.toLowerCase() === personEntity.toLowerCase())?.id;
+      
+      if (sensorEntityId) {
+        entity = sensorEntityId;
+      } else {
+        // Can't find sensor, but might be first render - allow it
+        return !this._lastState;
+      }
+    }
+    
+    const stateObj = this._hass.states[entity];
+    if (!stateObj) return false;
+    
+    const visitedCountries = stateObj?.attributes?.visited_countries || [];
+    const currentCountry = stateObj?.attributes?.current_country || null;
+    const stateValue = stateObj?.state;
+    
+    // Create current state signature
+    const currentState = {
+      visitedCountries: JSON.stringify(visitedCountries.sort()),
+      currentCountry: currentCountry,
+      stateValue: stateValue,
+      entity: entity
+    };
+    
+    // Compare with last state
+    if (!this._lastState) {
+      this._lastState = currentState;
+      return true; // First render
+    }
+    
+    // Check if anything relevant changed
+    const hasChanged = 
+      this._lastState.visitedCountries !== currentState.visitedCountries ||
+      this._lastState.currentCountry !== currentState.currentCountry ||
+      this._lastState.stateValue !== currentState.stateValue ||
+      this._lastState.entity !== currentState.entity;
+    
+    if (hasChanged) {
+      this._lastState = currentState;
+      return true;
+    }
+    
+    return false; // No relevant changes, skip render
   }
 
   async render() {
@@ -57,7 +248,7 @@ class CountriesMapCard extends HTMLElement {
 
     // Wait for CSS to load before rendering to ensure styling is applied
     try {
-      await this._loadCSS();
+      await loadCardCSS();
     } catch (error) {
       logWarn('CSS failed to load, card may appear unstyled:', error);
       // Continue anyway - card should still work, just without styling
@@ -206,79 +397,16 @@ class CountriesMapCard extends HTMLElement {
     `;
     
     this._setupTooltips();
-  }
-
-  _loadCSS() {
-    // Check if already loaded
-    const existingLink = document.getElementById('countries-map-card-styles');
-    if (existingLink && existingLink.sheet) {
-      return Promise.resolve(); // Already loaded and parsed
-    }
     
-    // If link exists but not loaded yet, return existing promise
-    if (existingLink && existingLink._loadPromise) {
-      return existingLink._loadPromise;
-    }
-    
-    return new Promise((resolve, reject) => {
-      const link = document.createElement('link');
-      link.id = 'countries-map-card-styles';
-      link.rel = 'stylesheet';
-      link.type = 'text/css';
-      
-      // Try HACS path first, then module-relative fallback
-      const moduleBaseUrl = new URL('.', import.meta.url);
-      const cssUrl = new URL('countries-map-card.css', moduleBaseUrl);
-      const cssPaths = [
-        '/hacsfiles/countries-visited/countries-map-card.css',
-        cssUrl.href
-      ];
-      
-      let currentPathIndex = 0;
-      let timeoutId = null;
-      
-      const tryLoad = (pathIndex) => {
-        if (pathIndex >= cssPaths.length) {
-          if (timeoutId) clearTimeout(timeoutId);
-          link._loadPromise = null;
-          reject(new Error('Failed to load CSS from all paths'));
-          return;
-        }
-        
-        link.href = cssPaths[pathIndex];
-        
-        // Set up timeout (5 seconds per path)
-        timeoutId = setTimeout(() => {
-          if (pathIndex < cssPaths.length - 1) {
-            // Try next path
-            tryLoad(pathIndex + 1);
-          } else {
-            // All paths failed
-            link._loadPromise = null;
-            reject(new Error('CSS loading timeout'));
-          }
-        }, 5000);
-        
-        // Success handler
-        link.onload = () => {
-          if (timeoutId) clearTimeout(timeoutId);
-          link._loadPromise = null;
-          resolve();
-        };
-        
-        // Error handler - try next path
-        link.onerror = () => {
-          if (timeoutId) clearTimeout(timeoutId);
-          tryLoad(pathIndex + 1);
-        };
+    // Update last state after rendering to track what was rendered
+    if (stateObj) {
+      this._lastState = {
+        visitedCountries: JSON.stringify(visitedCountries.sort()),
+        currentCountry: currentCountry,
+        stateValue: stateObj.state,
+        entity: entity
       };
-      
-      // Store promise on link element to prevent duplicate loads
-      link._loadPromise = Promise.resolve();
-      
-      document.head.appendChild(link);
-      tryLoad(0);
-    });
+    }
   }
 
   _adjustColor(color, amount) {
