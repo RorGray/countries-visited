@@ -7,6 +7,11 @@
   "codeowners": ["@suxarik", "@RorGray"],
   "config_flow": true,
   "iot_class": "local_polling",
-  "homeassistant": "2021.9.0",
-  "icon": "mdi:earth"
+  "icon": "mdi:earth",
+  "dependencies": [
+    "http",
+    "websocket_api",
+    "frontend",
+    "lovelace"
+  ]
 }

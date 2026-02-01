@@ -1,7 +1,7 @@
 # Countries Visited for Home Assistant
 
-![GitHub release (latest by date)](https://img.shields.io/github/v/release/RorGray/ha-countries-visited-plugin)
-![HACS validated](https://img.shields.io/badge/HACS-Default-orange)
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/RorGray/ha-countries-visited-plugin?style=for-the-badge)
+![HACS validated](https://img.shields.io/badge/HACS-Default-orange?style=for-the-badge)
 
 A Home Assistant integration to track and visualize countries visited by family members on an interactive world map.
 
