@@ -32,6 +32,10 @@ _CACHE_STATS = {
 # Reverse geocoder instance (lazy loaded)
 _reverse_geocoder = None
 
+# Rate limiting: track last API call time
+_last_api_call_time = 0.0
+RATE_LIMIT_SECONDS = 1.1  # Nominatim allows 1 request per second, use 1.1 for safety
+
 
 def _get_reverse_geocoder():
     """Get or create reverse geocoder instance."""
@@ -96,13 +100,15 @@ async def get_country_from_coords(hass, lat, lon):
     - 1 request per second (free tier)
     - Please be respectful of their service
     """
+    global _last_api_call_time
+    
     # Round coordinates to ~1km precision for caching (0.01° ≈ 1km)
     cache_key = (round(lat, 2), round(lon, 2))
     
     # Update statistics
     _CACHE_STATS["total_requests"] += 1
     
-    # Check cache first
+    # Check cache first - NO DELAY for cache hits!
     if cache_key in _COORDINATE_CACHE:
         cached_result = _COORDINATE_CACHE[cache_key]
         _CACHE_STATS["cache_hits"] += 1
@@ -122,16 +128,24 @@ async def get_country_from_coords(hass, lat, lon):
         return None
     
     try:
+        # Rate limiting: only wait if we need to make an API call
+        import time
+        current_time = time.time()
+        time_since_last_call = current_time - _last_api_call_time
+        
+        if time_since_last_call < RATE_LIMIT_SECONDS:
+            wait_time = RATE_LIMIT_SECONDS - time_since_last_call
+            _LOGGER.debug(f"Rate limiting: waiting {wait_time:.2f}s before API call")
+            await asyncio.sleep(wait_time)
+        
+        # Update last API call time
+        _last_api_call_time = time.time()
+        
         # Use async executor to avoid blocking
         from geopy.exc import GeocoderTimedOut, GeocoderServiceError
-        import time
         
         def reverse_geocode():
             try:
-                # Add delay to respect Nominatim rate limits (1 req/sec)
-                # Note: This is a simple approach; for production, consider a proper rate limiter
-                time.sleep(1.1)
-                
                 location = geocoder.reverse((lat, lon), exactly_one=True, timeout=10)
                 if location and location.raw:
                     address = location.raw.get("address", {})
@@ -371,8 +385,7 @@ class CountriesVisitedSensor(SensorEntity):
                     detected.add(country_code)
                     detected_count += 1
                     _LOGGER.debug(f"Detected country {country_code} from coordinates ({lat}, {lon})")
-                # Small delay between calls (in addition to rate limiting in get_country_from_coords)
-                await asyncio.sleep(0.1)
+                # No additional delay needed - rate limiting is handled in get_country_from_coords
             
             _LOGGER.info(
                 f"History processing complete for {person_entity}: "
