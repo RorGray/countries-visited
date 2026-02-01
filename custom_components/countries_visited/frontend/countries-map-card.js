@@ -1,5 +1,37 @@
 import { loadCountriesData } from './map-data.js';
 
+// Card version
+const CARD_VERSION = '0.1';
+
+// Styled console logging helper
+const logStyle = {
+  info: 'color: #4CAF50; font-weight: bold;',
+  warn: 'color: #FF9800; font-weight: bold;',
+  error: 'color: #F44336; font-weight: bold;',
+  debug: 'color: #2196F3; font-weight: bold;',
+  version: 'color: #2196F3; font-weight: bold; background: #E3F2FD; padding: 2px 6px; border-radius: 3px;',
+};
+
+function logInfo(message, ...args) {
+  console.log(`%c🌍 Countries Visited ${message}`, logStyle.info, ...args);
+}
+
+function logWarn(message, ...args) {
+  console.warn(`%c🌍 Countries Visited ${message}`, logStyle.warn, ...args);
+}
+
+function logError(message, ...args) {
+  console.error(`%c🌍 Countries Visited ${message}`, logStyle.error, ...args);
+}
+
+function logVersion() {
+  console.log(`%c🌍 Countries Visited Card v${CARD_VERSION}`, logStyle.version);
+}
+
+// Track if we've already logged sensor finding errors to avoid spam
+let _sensorErrorLogged = new Set();
+let _versionLogged = false;
+
 class CountriesMapCard extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
@@ -8,6 +40,12 @@ class CountriesMapCard extends HTMLElement {
 
   setConfig(config) {
     this._config = config;
+    
+    // Log version on first config set
+    if (!_versionLogged) {
+      logVersion();
+      _versionLogged = true;
+    }
   }
 
   getConfig() {
@@ -17,8 +55,13 @@ class CountriesMapCard extends HTMLElement {
   async render() {
     if (!this._config || !this._hass) return;
 
-    // Load CSS first, before any early returns, so styling is always applied
-    this._loadCSS();
+    // Wait for CSS to load before rendering to ensure styling is applied
+    try {
+      await this._loadCSS();
+    } catch (error) {
+      logWarn('CSS failed to load, card may appear unstyled:', error);
+      // Continue anyway - card should still work, just without styling
+    }
 
     let entity = this._config.entity || this._config.person;
     
@@ -60,68 +103,52 @@ class CountriesMapCard extends HTMLElement {
       
       if (sensorEntityId) {
         entity = sensorEntityId;
-        console.debug(`Countries Map Card: Found sensor entity ${sensorEntityId} for person ${personEntity} (match type: ${matchType})`);
+        // Don't log successful finds - too verbose on every render
+        // Only log once on first successful find
+        if (!this._sensorFoundLogged) {
+          this._sensorFoundLogged = true;
+        }
       } else {
-        // Detailed error logging for debugging
-        const debugInfo = {
-          searchingFor: personEntity,
-          totalSensorsFound: allSensors.length,
-          sensors: allSensors.map(s => ({
-            entityId: s.id,
-            exists: s.exists,
-            personAttribute: s.person,
-            personAttributeType: typeof s.person,
-            personMatches: s.person === personEntity,
-            personMatchesCaseInsensitive: s.person?.toLowerCase() === personEntity.toLowerCase(),
-            hasAttributes: s.hasAttributes,
-            visitedCountriesCount: s.visitedCountries?.length || 0,
-            stateValue: s.stateValue
-          }))
-        };
+        // Only log error once per person entity to avoid spam
+        const errorKey = `sensor_error_${personEntity}`;
+        if (!_sensorErrorLogged.has(errorKey)) {
+          _sensorErrorLogged.add(errorKey);
+          
+          // Detailed error logging for debugging (only once)
+          const debugInfo = {
+            searchingFor: personEntity,
+            totalSensorsFound: allSensors.length,
+            sensors: allSensors.map(s => ({
+              entityId: s.id,
+              exists: s.exists,
+              personAttribute: s.person,
+              personAttributeType: typeof s.person,
+              personMatches: s.person === personEntity,
+              personMatchesCaseInsensitive: s.person?.toLowerCase() === personEntity.toLowerCase(),
+              hasAttributes: s.hasAttributes,
+              visitedCountriesCount: s.visitedCountries?.length || 0,
+              stateValue: s.stateValue
+            }))
+          };
+          
+          logError('Could not find sensor entity for person', {
+            searchingFor: personEntity,
+            totalSensorsFound: allSensors.length,
+            availableSensors: allSensors.map(s => `${s.id} (person: ${s.person || 'none'})`),
+            debug: debugInfo
+          });
+        }
         
-        console.error('Countries Map Card: Could not find sensor entity for person', {
-          searchingFor: personEntity,
-          searchType: typeof personEntity,
-          totalSensorsFound: allSensors.length,
-          sensors: debugInfo.sensors,
-          allSensorIds: allSensors.map(s => s.id),
-          allPersonAttributes: allSensors.map(s => ({ id: s.id, person: s.person, type: typeof s.person })),
-          comparison: {
-            exactMatchAttempted: personEntity,
-            caseInsensitiveAttempted: personEntity.toLowerCase(),
-            foundPersonValues: allSensors.map(s => s.person).filter(Boolean)
-          }
-        });
+        // Throw error so Home Assistant displays it properly
+        // This is better than showing custom HTML, especially during startup
+        const availableSensors = allSensors.length > 0
+          ? `\n\nAvailable sensors:\n${allSensors.map(s => `  - ${s.id} (person: ${s.person || 'none'})`).join('\n')}`
+          : '\n\nNo sensor entities found. Make sure the Countries Visited integration is installed and configured.';
         
-        // Don't proceed if we can't find the sensor entity
-        const errorDetails = allSensors.length > 0 
-          ? `<div style="text-align: left; margin-top: 10px; font-size: 0.9em;">
-              <p><strong>Found ${allSensors.length} sensor(s):</strong></p>
-              <ul style="margin: 5px 0; padding-left: 20px;">
-                ${allSensors.map(s => `
-                  <li>
-                    <code>${s.id}</code><br>
-                    Person attribute: <code>${s.person || '(missing)'}</code> (${typeof s.person})<br>
-                    ${s.person ? `Match: ${s.person === personEntity ? '✓ Exact' : s.person?.toLowerCase() === personEntity.toLowerCase() ? '✓ Case-insensitive' : '✗ No match'}` : 'No person attribute'}
-                  </li>
-                `).join('')}
-              </ul>
-            </div>`
-          : '<p>No sensor entities found. Make sure the Countries Visited integration is installed and configured.</p>';
-        
-        this.innerHTML = `
-          <div class="countries-card">
-            <div class="card-header">
-              <div class="card-title">Countries Visited</div>
-            </div>
-            <div style="padding: 20px; text-align: center; color: #888;">
-              <p>Could not find sensor entity for person: <strong>${personEntity}</strong></p>
-              <p>Please make sure the Countries Visited integration is configured for this person.</p>
-              ${errorDetails}
-            </div>
-          </div>
-        `;
-        return;
+        throw new Error(
+          `Could not find sensor entity for person: ${personEntity}. ` +
+          `Please make sure the Countries Visited integration is configured for this person.${availableSensors}`
+        );
       }
     }
     
@@ -131,6 +158,12 @@ class CountriesMapCard extends HTMLElement {
     const title = this._config.title || 'Countries Visited';
     
     const stateObj = this._hass.states[entity];
+    
+    // If entity doesn't exist, throw error for Home Assistant to display
+    if (!stateObj) {
+      throw new Error(`Entity ${entity} not found. Make sure the Countries Visited integration is configured.`);
+    }
+    
     const visitedCountries = stateObj?.attributes?.visited_countries || [];
     const currentCountry = stateObj?.attributes?.current_country || null;
 
@@ -176,28 +209,76 @@ class CountriesMapCard extends HTMLElement {
   }
 
   _loadCSS() {
-    if (document.getElementById('countries-map-card-styles')) return;
+    // Check if already loaded
+    const existingLink = document.getElementById('countries-map-card-styles');
+    if (existingLink && existingLink.sheet) {
+      return Promise.resolve(); // Already loaded and parsed
+    }
     
-    const link = document.createElement('link');
-    link.id = 'countries-map-card-styles';
-    link.rel = 'stylesheet';
-    link.type = 'text/css';
+    // If link exists but not loaded yet, return existing promise
+    if (existingLink && existingLink._loadPromise) {
+      return existingLink._loadPromise;
+    }
     
-    // Try HACS path first, then module-relative fallback
-    const moduleBaseUrl = new URL('.', import.meta.url);
-    const cssUrl = new URL('countries-map-card.css', moduleBaseUrl);
-    const cssPaths = [
-      '/hacsfiles/countries-visited/countries-map-card.css',
-      cssUrl.href
-    ];
-    
-    // Try first path, fallback to second if needed
-    link.href = cssPaths[0];
-    link.onerror = () => {
-      link.href = cssPaths[1];
-    };
-    
-    document.head.appendChild(link);
+    return new Promise((resolve, reject) => {
+      const link = document.createElement('link');
+      link.id = 'countries-map-card-styles';
+      link.rel = 'stylesheet';
+      link.type = 'text/css';
+      
+      // Try HACS path first, then module-relative fallback
+      const moduleBaseUrl = new URL('.', import.meta.url);
+      const cssUrl = new URL('countries-map-card.css', moduleBaseUrl);
+      const cssPaths = [
+        '/hacsfiles/countries-visited/countries-map-card.css',
+        cssUrl.href
+      ];
+      
+      let currentPathIndex = 0;
+      let timeoutId = null;
+      
+      const tryLoad = (pathIndex) => {
+        if (pathIndex >= cssPaths.length) {
+          if (timeoutId) clearTimeout(timeoutId);
+          link._loadPromise = null;
+          reject(new Error('Failed to load CSS from all paths'));
+          return;
+        }
+        
+        link.href = cssPaths[pathIndex];
+        
+        // Set up timeout (5 seconds per path)
+        timeoutId = setTimeout(() => {
+          if (pathIndex < cssPaths.length - 1) {
+            // Try next path
+            tryLoad(pathIndex + 1);
+          } else {
+            // All paths failed
+            link._loadPromise = null;
+            reject(new Error('CSS loading timeout'));
+          }
+        }, 5000);
+        
+        // Success handler
+        link.onload = () => {
+          if (timeoutId) clearTimeout(timeoutId);
+          link._loadPromise = null;
+          resolve();
+        };
+        
+        // Error handler - try next path
+        link.onerror = () => {
+          if (timeoutId) clearTimeout(timeoutId);
+          tryLoad(pathIndex + 1);
+        };
+      };
+      
+      // Store promise on link element to prevent duplicate loads
+      link._loadPromise = Promise.resolve();
+      
+      document.head.appendChild(link);
+      tryLoad(0);
+    });
   }
 
   _adjustColor(color, amount) {
@@ -292,6 +373,9 @@ if (window.customCards) {
 if (window.loadCardHelpers) {
   window.loadCardHelpers().then((helpers) => {
     // Card helpers are loaded, card should be discoverable
-    console.log('Countries Visited card registered with Home Assistant');
+    if (!_versionLogged) {
+      logVersion();
+      _versionLogged = true;
+    }
   });
 }

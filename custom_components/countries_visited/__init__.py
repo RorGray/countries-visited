@@ -158,7 +158,14 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     # Set up optional file logging FIRST, before any other logging
     await hass.async_add_executor_job(_setup_file_logging, hass)
     
-    _LOGGER.info("Setting up Countries Visited integration (global setup)")
+    # Get version from manifest
+    try:
+        manifest = hass.data.get("integrations", {}).get(DOMAIN, {}).manifest
+        version = manifest.get("version", "unknown")
+    except Exception:
+        version = "unknown"
+    
+    _LOGGER.info("🌍 Setting up Countries Visited integration v%s (global setup)", version)
     _LOGGER.debug("File logging should now be active - check countries_visited.log")
 
     # Ensure frontend files exist on every Home Assistant startup
@@ -170,7 +177,14 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Countries Visited from a config entry."""
-    _LOGGER.info(f"Setting up Countries Visited integration for {entry.entry_id}")
+    # Get version from manifest
+    try:
+        manifest = hass.data.get("integrations", {}).get(DOMAIN, {}).manifest
+        version = manifest.get("version", "unknown")
+    except Exception:
+        version = "unknown"
+    
+    _LOGGER.info("🌍 Setting up Countries Visited integration v%s for %s", version, entry.entry_id)
 
     # Initialize domain data if not exists
     hass.data.setdefault(DOMAIN, {})

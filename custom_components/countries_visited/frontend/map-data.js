@@ -1,5 +1,25 @@
 // Countries data - loaded from SVG and JSON files
 let countriesData = null;
+let _dataLoadLogged = false;
+
+// Styled console logging helper
+const logStyle = {
+  info: 'color: #4CAF50; font-weight: bold;',
+  warn: 'color: #FF9800; font-weight: bold;',
+  error: 'color: #F44336; font-weight: bold;',
+};
+
+function logInfo(message, ...args) {
+  console.log(`%c🌍 Countries Visited ${message}`, logStyle.info, ...args);
+}
+
+function logWarn(message, ...args) {
+  console.warn(`%c🌍 Countries Visited ${message}`, logStyle.warn, ...args);
+}
+
+function logError(message, ...args) {
+  console.error(`%c🌍 Countries Visited ${message}`, logStyle.error, ...args);
+}
 
 export async function loadCountriesData() {
   if (countriesData) return countriesData;
@@ -21,7 +41,10 @@ export async function loadCountriesData() {
         const response = await fetch(path);
         if (response.ok) {
           svgText = await response.text();
-          console.log('Successfully loaded world.svg from:', path);
+          if (!_dataLoadLogged) {
+            logInfo('Map data loaded successfully');
+            _dataLoadLogged = true;
+          }
           break;
         } else {
           lastError = `Status ${response.status} from ${path}`;
@@ -33,7 +56,7 @@ export async function loadCountriesData() {
     }
     
     if (!svgText) {
-      console.error('Failed to load world.svg from any path. Last error:', lastError);
+      logError('Failed to load world map data', lastError);
       return [];
     }
     
@@ -56,7 +79,6 @@ export async function loadCountriesData() {
         const response = await fetch(path);
         if (response.ok) {
           countryInfo = await response.json();
-          console.log('Successfully loaded country-info.json from:', path);
           break;
         } else {
           lastInfoError = `Status ${response.status} from ${path}`;
@@ -68,7 +90,7 @@ export async function loadCountriesData() {
     }
     
     if (Object.keys(countryInfo).length === 0) {
-      console.warn('Failed to load country-info.json, using SVG titles only. Last error:', lastInfoError);
+      logWarn('Country info not loaded, using SVG titles only', lastInfoError);
     }
     
     countriesData = Array.from(paths).map(path => {
@@ -89,7 +111,7 @@ export async function loadCountriesData() {
     
     return countriesData;
   } catch (e) {
-    console.error('Failed to load countries data:', e);
+    logError('Failed to load countries data', e);
     return [];
   }
 }
