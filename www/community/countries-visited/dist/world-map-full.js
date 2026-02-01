@@ -1,11 +1,39 @@
-// Countries data - loaded from JSON file
+// Countries data - loaded from SVG and JSON files
 let countriesData = null;
 
 async function loadCountriesData() {
   if (countriesData) return countriesData;
   try {
-    const response = await fetch('/local/community/countries-visited/countries-data.json');
-    countriesData = await response.json();
+    // Load SVG file to extract path data
+    const svgResponse = await fetch('/local/community/countries-visited/data/world.svg');
+    const svgText = await svgResponse.text();
+    
+    // Parse SVG to extract path elements
+    const parser = new DOMParser();
+    const svgDoc = parser.parseFromString(svgText, 'image/svg+xml');
+    const paths = svgDoc.querySelectorAll('path');
+    
+    // Load country info for metadata
+    const infoResponse = await fetch('/local/community/countries-visited/data/country-info.json');
+    const countryInfo = await infoResponse.json();
+    
+    // Combine SVG path data with country info
+    countriesData = Array.from(paths).map(path => {
+      const id = path.getAttribute('id');
+      const d = path.getAttribute('d');
+      const title = path.getAttribute('title') || '';
+      
+      // Get country name from country-info.json, fallback to title from SVG
+      const info = countryInfo[id];
+      const name = info?.name || title || id;
+      
+      return {
+        id: id,
+        d: d,
+        name: name
+      };
+    }).filter(c => c.id && c.d); // Filter out invalid entries
+    
     return countriesData;
   } catch (e) {
     console.error('Failed to load countries data:', e);
@@ -257,4 +285,4 @@ class CountriesMapCard extends HTMLElement {
   }
 }
 
-customElements.define('countries-map-card', CountriesMapCard);</parameter>
+customElements.define('countries-map-card', CountriesMapCard);

@@ -5,5 +5,5 @@
   "categories": ["plugin"],
   "homeassistant": "2024.11.0",
   "render_readme": true,
-  "issues": "https://github.com/suxarik/ha-countries-visited-plugin/issues"
+  "issues": "https://github.com/RorGray/ha-countries-visited-plugin/issues"
 }

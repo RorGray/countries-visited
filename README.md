@@ -1,13 +1,15 @@
 # Countries Visited for Home Assistant
 
-![GitHub release (latest by date)](https://img.shields.io/github/v/release/yourusername/countries-visited)
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/RorGray/ha-countries-visited-plugin)
 ![HACS validated](https://img.shields.io/badge/HACS-Default-orange)
+
+This project is based on [suxarik/ha-countries-visited-plugin](https://github.com/suxarik/ha-countries-visited-plugin).
 
 A Home Assistant integration to track and visualize countries visited by family members on an interactive world map.
 
 ## Features
 
-- 🌍 **Full World Map** - Interactive SVG map with 200+ countries and territories
+- 🌍 **Full World Map** - Interactive SVG map with 250+ countries and territories
 - 👤 **Multi-Person Support** - Track visits for multiple people independently
 - 🎨 **Customizable Colors** - Configure map, visited, and current location colors
 - 🔧 **Manual Management** - Add/remove countries via services
@@ -23,15 +25,9 @@ A Home Assistant integration to track and visualize countries visited by family 
 
 1. Add this repository to HACS:
    - Go to **HACS** → **Integrations** → **⋮** → **Add custom repository**
-   - Repository: `https://github.com/yourusername/countries-visited`
+   - Repository: `https://github.com/RorGray/ha-countries-visited-plugin`
    - Category: **Integration**
 2. Install "Countries Visited" from HACS
-3. Restart Home Assistant
-
-### Manual
-
-1. Copy the `custom_components/countries_visited` folder to your Home Assistant config directory
-2. Copy the `www/community/countries-visited` folder to your Home Assistant `www` directory
 3. Restart Home Assistant
 
 ## Configuration
@@ -44,13 +40,6 @@ A Home Assistant integration to track and visualize countries visited by family 
 4. Select the person to track
 5. Configure colors (optional)
 
-### Via YAML
-
-```yaml
-# configuration.yaml (not recommended for this integration)
-# Use UI configuration instead
-```
-
 ## Lovelace Card
 
 Add the resource first:
@@ -58,7 +47,7 @@ Add the resource first:
 **Configuration** → **Lovelace Dashboards** → **Resources** → **+ Add Resource**
 
 ```
-URL: /local/community/countries-visited/countries-visited.js
+URL: /local/community/countries-visited/dist/countries-visited.js
 Resource type: JavaScript Module
 ```
 
@@ -68,7 +57,7 @@ Then add the card to your dashboard:
 type: custom:countries-map-card
 entity: person.your_name
 visited_color: '#4CAF50'
-map_color: '#e0e0e0'
+map_color: '#d0d0d0'
 ```
 
 ### Card Options
@@ -81,7 +70,6 @@ map_color: '#e0e0e0'
 | `current_color` | string | `#FF5722` | Color for current location |
 | `map_color` | string | `#d0d0d0` | Color for non-visited countries |
 | `title` | string | `Countries Visited` | Card title |
-| `show_legend` | boolean | `true` | Show legend |
 
 ## Services
 
@@ -173,5 +161,5 @@ MIT License - see LICENSE file for details
 
 ## Support
 
-- [GitHub Issues](https://github.com/yourusername/countries-visited/issues)
+- [GitHub Issues](https://github.com/RorGray/ha-countries-visited-plugin/issues)
 - [Home Assistant Community](https://community.home-assistant.io/)
