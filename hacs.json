@@ -5,5 +5,6 @@
   "categories": ["plugin"],
   "homeassistant": "2021.9.0",
   "render_readme": true,
-  "issues": "https://github.com/RorGray/ha-countries-visited-plugin/issues"
+  "issues": "https://github.com/RorGray/ha-countries-visited-plugin/issues",
+  "filename": "/www/community/countries_visited/countries-map-card.js"
 }
