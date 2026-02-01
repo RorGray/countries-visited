@@ -10,7 +10,8 @@ export async function loadCountriesData() {
     const dataUrl = new URL('data/world.svg', moduleBaseUrl);
     
     const svgPaths = [
-      '/countries_visited/data/world.svg',  // HA absolute path
+      '/hacsfiles/countries-visited/data/world.svg',  // HACS path
+      '/countries_visited/data/world.svg',  // Legacy path (fallback)
       dataUrl.href,  // Relative to module location (works for both file:// and http://)
       '../custom_components/countries_visited/frontend/data/world.svg',  // Demo relative path from demo/
       'custom_components/countries_visited/frontend/data/world.svg',  // Demo relative path from root
@@ -48,7 +49,8 @@ export async function loadCountriesData() {
     // Try multiple paths for country info JSON
     const infoUrl = new URL('data/country-info.json', moduleBaseUrl);
     const infoPaths = [
-      '/countries_visited/data/country-info.json',  // HA absolute path
+      '/hacsfiles/countries-visited/data/country-info.json',  // HACS path
+      '/countries_visited/data/country-info.json',  // Legacy path (fallback)
       infoUrl.href,  // Relative to module location (works for both file:// and http://)
       '../custom_components/countries_visited/frontend/data/country-info.json',  // Demo relative path from demo/
       'custom_components/countries_visited/frontend/data/country-info.json',  // Demo relative path from root

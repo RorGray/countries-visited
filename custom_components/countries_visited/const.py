@@ -12,7 +12,7 @@ DEFAULT_MAP_COLOR = "#e0e0e0"
 DEFAULT_VISITED_COLOR = "#4CAF50"
 
 # Frontend constants
-URL_BASE = "/countries_visited"
+URL_BASE = "/hacsfiles/countries-visited"
 COUNTRIES_VISITED_CARDS = [
     {
         "name": "Countries Map Data",
