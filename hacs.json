@@ -2,9 +2,9 @@
   "name": "Countries Visited",
   "description": "Track and visualize countries visited by family members on a world map",
   "country": "XX",
-  "categories": ["plugin"],
+  "categories": ["integration"],
   "homeassistant": "2021.9.0",
   "render_readme": true,
   "issues": "https://github.com/RorGray/countries-visited/issues",
-  "icon": "icon.svg"
+  "icon": "icon.png"
 }
