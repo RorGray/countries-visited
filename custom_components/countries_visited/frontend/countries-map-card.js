@@ -1,4 +1,4 @@
-import { loadCountriesData } from './countries_visited/map-data.js';
+import { loadCountriesData } from './map-data.js';
 
 class CountriesMapCard extends HTMLElement {
   set hass(hass) {

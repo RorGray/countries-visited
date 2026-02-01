@@ -11,6 +11,21 @@ CONF_VISITED_COLOR = "visited_color"
 DEFAULT_MAP_COLOR = "#e0e0e0"
 DEFAULT_VISITED_COLOR = "#4CAF50"
 
+# Frontend constants
+URL_BASE = "/countries_visited"
+COUNTRIES_VISITED_CARDS = [
+    {
+        "name": "Countries Map Data",
+        "filename": "map-data.js",
+        "version": "0.1.0",
+    },
+    {
+        "name": "Countries Map Card",
+        "filename": "countries-map-card.js",
+        "version": "0.1.0",
+    }
+]
+
 # ISO country code mapping (partial - for key countries)
 ISO_TO_NAME = {
     "US": "United States",
