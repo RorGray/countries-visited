@@ -30,175 +30,70 @@ class CountriesMapCard extends HTMLElement {
     // Load countries data
     const countries = await loadCountriesData();
 
+    // Load CSS if not already loaded
+    this._loadCSS();
+
     this.innerHTML = `
-      <style>
-        .countries-card {
-          background: var(--card-background-color, #fff);
-          border-radius: 16px;
-          padding: 20px;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-          font-family: var(--primary-font-family, system-ui);
-        }
-        .card-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 16px;
-          padding-bottom: 12px;
-          border-bottom: 1px solid var(--divider-color, #e5e5e5);
-        }
-        .card-title {
-          font-size: 20px;
-          font-weight: 600;
-          color: var(--primary-text-color, #1a1a1a);
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-        .card-title ha-icon { color: ${visitedColor}; }
-        .card-stats {
-          font-size: 14px;
-          color: var(--secondary-text-color, #666);
-          background: ${visitedColor}15;
-          padding: 8px 16px;
-          border-radius: 20px;
-        }
-        .card-stats strong {
-          color: ${visitedColor};
-          font-size: 18px;
-          font-weight: 700;
-        }
-        .current-badge {
-          font-size: 12px;
-          color: ${currentColor};
-          background: ${currentColor}15;
-          padding: 4px 10px;
-          border-radius: 12px;
-          margin-left: 8px;
-          display: ${currentCountry ? 'inline-flex' : 'none'};
-          align-items: center;
-          gap: 4px;
-        }
-        .map-container {
-          position: relative;
-          width: 100%;
-          background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
-          border-radius: 12px;
-          overflow: hidden;
-        }
-        .map-container svg { width: 100%; height: auto; display: block; }
-        .country {
-          fill: ${mapColor};
-          stroke: var(--card-background-color, #fff);
-          stroke-width: 0.5;
-          transition: fill 0.3s ease, opacity 0.2s ease, stroke-width 0.2s ease;
-          cursor: pointer;
-        }
-        .country.visited { fill: ${visitedColor}; }
-        .country.current {
-          fill: ${currentColor};
-          stroke: ${currentColor};
-          stroke-width: 2;
-          animation: pulse-border 2s infinite;
-        }
-        .country:hover {
-          opacity: 0.85;
-          stroke-width: 1;
-          filter: brightness(1.1);
-        }
-        .country.visited:hover { fill: ${this._adjustColor(visitedColor, -15)}; }
-        .country.current:hover { fill: ${this._adjustColor(currentColor, -15)}; }
-        @keyframes pulse-border {
-          0%, 100% { stroke-width: 2; }
-          50% { stroke-width: 3; }
-        }
-        .tooltip {
-          position: absolute;
-          background: var(--card-background-color, #fff);
-          color: var(--primary-text-color, #1a1a1a);
-          padding: 6px 10px;
-          border-radius: 6px;
-          font-size: 12px;
-          font-weight: 500;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-          pointer-events: none;
-          opacity: 0;
-          transition: opacity 0.2s ease;
-          z-index: 100;
-          transform: translate(-50%, -100%);
-          margin-top: -8px;
-        }
-        .tooltip.visible { opacity: 1; }
-        .legend {
-          display: flex;
-          gap: 16px;
-          margin-top: 12px;
-          padding-top: 12px;
-          border-top: 1px solid var(--divider-color, #e5e5e5);
-          font-size: 12px;
-          color: var(--secondary-text-color, #666);
-          flex-wrap: wrap;
-        }
-        .legend-item { display: flex; align-items: center; gap: 6px; }
-        .legend-color { width: 16px; height: 10px; border-radius: 2px; }
-        .legend-color.visited { background: ${visitedColor}; }
-        .legend-color.current { background: ${currentColor}; }
-        .legend-color.default { background: ${mapColor}; }
-        .country-tags {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 6px;
-          margin-top: 12px;
-        }
-        .country-tag {
-          background: ${visitedColor}20;
-          color: ${visitedColor};
-          padding: 4px 10px;
-          border-radius: 12px;
-          font-size: 12px;
-          font-weight: 500;
-        }
-        .country-tag.current {
-          background: ${currentColor}20;
-          color: ${currentColor};
-        }
-      </style>
-      
       <div class="countries-card">
         <div class="card-header">
           <div class="card-title">
-            <ha-icon icon="mdi:earth"></ha-icon>
+            <ha-icon icon="mdi:earth" style="color: ${visitedColor};"></ha-icon>
             ${title}
-            <span class="current-badge">
+            <span class="current-badge ${currentCountry ? 'visible' : ''}" style="color: ${currentColor}; background: ${currentColor}15;">
               <ha-icon icon="mdi:map-marker"></ha-icon>
               ${currentCountry || ''}
             </span>
           </div>
-          <div class="card-stats"><strong>${visitedCountries.length}</strong> countries</div>
+          <div class="card-stats" style="background: ${visitedColor}15;"><strong style="color: ${visitedColor};">${visitedCountries.length}</strong> countries</div>
         </div>
         
         <div class="map-container" id="map-container">
-          ${this.getWorldMapSVG(countries, visitedCountries, currentCountry)}
+          ${this.getWorldMapSVG(countries, visitedCountries, currentCountry, mapColor, visitedColor, currentColor)}
           <div class="tooltip" id="tooltip"></div>
         </div>
         
         ${visitedCountries.length > 0 ? `
         <div class="country-tags">
           ${visitedCountries.map(code => `
-            <span class="country-tag ${code === currentCountry ? 'current' : ''}">${code}</span>
+            <span class="country-tag ${code === currentCountry ? 'current' : ''}" style="background: ${code === currentCountry ? currentColor + '20' : visitedColor + '20'}; color: ${code === currentCountry ? currentColor : visitedColor};">${code}</span>
           `).join('')}
         </div>
         ` : ''}
         
         <div class="legend">
-          <div class="legend-item"><div class="legend-color visited"></div><span>Visited</span></div>
-          <div class="legend-item"><div class="legend-color current"></div><span>Current</span></div>
-          <div class="legend-item"><div class="legend-color default"></div><span>Not visited</span></div>
+          <div class="legend-item"><div class="legend-color visited" style="background: ${visitedColor};"></div><span>Visited</span></div>
+          <div class="legend-item"><div class="legend-color current" style="background: ${currentColor};"></div><span>Current</span></div>
+          <div class="legend-item"><div class="legend-color default" style="background: ${mapColor};"></div><span>Not visited</span></div>
         </div>
       </div>
     `;
     
     this._setupTooltips();
+  }
+
+  _loadCSS() {
+    if (document.getElementById('countries-map-card-styles')) return;
+    
+    const link = document.createElement('link');
+    link.id = 'countries-map-card-styles';
+    link.rel = 'stylesheet';
+    link.type = 'text/css';
+    
+    // Try HACS path first, then module-relative fallback
+    const moduleBaseUrl = new URL('.', import.meta.url);
+    const cssUrl = new URL('countries-map-card.css', moduleBaseUrl);
+    const cssPaths = [
+      '/hacsfiles/countries-visited/countries-map-card.css',
+      cssUrl.href
+    ];
+    
+    // Try first path, fallback to second if needed
+    link.href = cssPaths[0];
+    link.onerror = () => {
+      link.href = cssPaths[1];
+    };
+    
+    document.head.appendChild(link);
   }
 
   _adjustColor(color, amount) {
@@ -214,32 +109,62 @@ class CountriesMapCard extends HTMLElement {
     const tooltip = this.querySelector('#tooltip');
     if (!container || !tooltip) return;
     
+    const visitedColor = this._config.visited_color || '#4CAF50';
+    const currentColor = this._config.current_color || '#FF5722';
+    
     container.querySelectorAll('.country').forEach(country => {
+      const originalFill = country.getAttribute('fill');
+      const isCurrent = country.classList.contains('current');
+      const isVisited = country.classList.contains('visited');
+      
       country.addEventListener('mouseenter', () => {
         const name = country.getAttribute('title') || country.id;
-        const isCurrent = country.classList.contains('current');
-        const isVisited = country.classList.contains('visited');
         tooltip.textContent = isCurrent ? `${name} (Current)` : isVisited ? `${name} (Visited)` : name;
         tooltip.classList.add('visible');
+        
+        // Darken color on hover
+        if (isCurrent) {
+          country.setAttribute('fill', this._adjustColor(currentColor, -15));
+        } else if (isVisited) {
+          country.setAttribute('fill', this._adjustColor(visitedColor, -15));
+        }
       });
+      
       country.addEventListener('mousemove', (e) => {
         const rect = container.getBoundingClientRect();
         tooltip.style.left = (e.clientX - rect.left) + 'px';
         tooltip.style.top = (e.clientY - rect.top) + 'px';
       });
-      country.addEventListener('mouseleave', () => tooltip.classList.remove('visible'));
+      
+      country.addEventListener('mouseleave', () => {
+        tooltip.classList.remove('visible');
+        // Restore original color
+        country.setAttribute('fill', originalFill);
+      });
     });
   }
 
-  getWorldMapSVG(countries, visitedCountries, currentCountry) {
+  getWorldMapSVG(countries, visitedCountries, currentCountry, mapColor, visitedColor, currentColor) {
     return `<svg viewBox="0 0 1000 666" preserveAspectRatio="xMidYMid meet">
       ${countries.map(c => {
         const isCurrent = currentCountry === c.id;
         const isVisited = visitedCountries.includes(c.id);
         let cls = 'country';
-        if (isCurrent) cls += ' current';
-        else if (isVisited) cls += ' visited';
-        return `<path id="${c.id}" class="${cls}" d="${c.d}" title="${c.name}"/>`;
+        let fill = mapColor;
+        let stroke = 'var(--card-background-color, #fff)';
+        let strokeWidth = '0.5';
+        
+        if (isCurrent) {
+          cls += ' current';
+          fill = currentColor;
+          stroke = currentColor;
+          strokeWidth = '2';
+        } else if (isVisited) {
+          cls += ' visited';
+          fill = visitedColor;
+        }
+        
+        return `<path id="${c.id}" class="${cls}" d="${c.d}" title="${c.name}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"/>`;
       }).join('')}
     </svg>`;
   }

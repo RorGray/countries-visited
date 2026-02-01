@@ -4,18 +4,14 @@ let countriesData = null;
 export async function loadCountriesData() {
   if (countriesData) return countriesData;
   try {
-    // Try multiple paths for SVG file (absolute for HA, relative for demo)
+    // Try paths for SVG file (HACS path and module-relative fallback)
     // Use import.meta.url to get the current module's location
     const moduleBaseUrl = new URL('.', import.meta.url);
     const dataUrl = new URL('data/world.svg', moduleBaseUrl);
     
     const svgPaths = [
       '/hacsfiles/countries-visited/data/world.svg',  // HACS path
-      '/countries_visited/data/world.svg',  // Legacy path (fallback)
-      dataUrl.href,  // Relative to module location (works for both file:// and http://)
-      '../custom_components/countries_visited/frontend/data/world.svg',  // Demo relative path from demo/
-      'custom_components/countries_visited/frontend/data/world.svg',  // Demo relative path from root
-      './data/world.svg'  // Fallback (relative to module)
+      dataUrl.href  // Relative to module location (fallback)
     ];
     
     let svgText = null;
@@ -50,11 +46,7 @@ export async function loadCountriesData() {
     const infoUrl = new URL('data/country-info.json', moduleBaseUrl);
     const infoPaths = [
       '/hacsfiles/countries-visited/data/country-info.json',  // HACS path
-      '/countries_visited/data/country-info.json',  // Legacy path (fallback)
-      infoUrl.href,  // Relative to module location (works for both file:// and http://)
-      '../custom_components/countries_visited/frontend/data/country-info.json',  // Demo relative path from demo/
-      'custom_components/countries_visited/frontend/data/country-info.json',  // Demo relative path from root
-      './data/country-info.json'  // Fallback (relative to module)
+      infoUrl.href  // Relative to module location (fallback)
     ];
     
     let countryInfo = {};

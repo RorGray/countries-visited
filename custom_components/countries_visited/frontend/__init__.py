@@ -26,7 +26,7 @@ class CountriesVisitedCardRegistration:
             if self.hass.data["lovelace"].mode == "storage":
                 await self.async_wait_for_lovelace_resources()
         except Exception as e:
-            _LOGGER.error(f"Failed to register Countries Visited frontend: {e}")
+            _LOGGER.error(f"Failed to register Countries Visited frontend: {e}", exc_info=True)
 
     async def async_register_countries_visited_path(self):
         """Register custom cards path if not already registered."""
@@ -69,7 +69,7 @@ class CountriesVisitedCardRegistration:
 
     async def async_register_countries_visited_cards(self):
         """Register Countries Visited cards in Lovelace resources."""
-        _LOGGER.debug("Installing Lovelace resources for countries_visited cards")
+        _LOGGER.info("Installing Lovelace resources for countries_visited cards")
 
         resources = self.hass.data["lovelace"].resources
 

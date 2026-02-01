@@ -1,0 +1,155 @@
+.countries-card {
+  background: var(--card-background-color, #fff);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  font-family: var(--primary-font-family, system-ui);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--divider-color, #e5e5e5);
+}
+
+.card-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--primary-text-color, #1a1a1a);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.card-stats {
+  font-size: 14px;
+  color: var(--secondary-text-color, #666);
+  padding: 8px 16px;
+  border-radius: 20px;
+}
+
+.card-stats strong {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.current-badge {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  margin-left: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.current-badge:not(.visible) {
+  display: none;
+}
+
+.map-container {
+  position: relative;
+  width: 100%;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.map-container svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.country {
+  stroke: var(--card-background-color, #fff);
+  stroke-width: 0.5;
+  transition: fill 0.3s ease, opacity 0.2s ease, stroke-width 0.2s ease;
+  cursor: pointer;
+}
+
+.country.visited {
+  /* fill set dynamically */
+}
+
+.country.current {
+  /* fill and stroke set dynamically */
+  stroke-width: 2;
+  animation: pulse-border 2s infinite;
+}
+
+.country:hover {
+  opacity: 0.85;
+  stroke-width: 1;
+  filter: brightness(1.1);
+}
+
+@keyframes pulse-border {
+  0%, 100% {
+    stroke-width: 2;
+  }
+  50% {
+    stroke-width: 3;
+  }
+}
+
+.tooltip {
+  position: absolute;
+  background: var(--card-background-color, #fff);
+  color: var(--primary-text-color, #1a1a1a);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 100;
+  transform: translate(-50%, -100%);
+  margin-top: -8px;
+}
+
+.tooltip.visible {
+  opacity: 1;
+}
+
+.legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--divider-color, #e5e5e5);
+  font-size: 12px;
+  color: var(--secondary-text-color, #666);
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-color {
+  width: 16px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.country-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.country-tag {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
