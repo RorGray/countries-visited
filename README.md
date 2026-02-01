@@ -11,7 +11,9 @@ A Home Assistant integration to track and visualize countries visited by family 
 - 👤 **Multi-Person Support** - Track visits for multiple people independently
 - 🎨 **Customizable Colors** - Configure map, visited, and current location colors
 - 🔧 **Manual Management** - Add/remove countries via services
-- 📊 **Automatic Tracking** - Detects countries from device_tracker history
+- 📊 **Automatic Tracking** - Detects countries from device_tracker history using reverse geocoding
+- 🗺️ **Reverse Geocoding** - Converts GPS coordinates to country codes using Nominatim (OpenStreetMap)
+- 📈 **Cache Statistics** - Monitor geocoding cache performance with dedicated sensor
 - 🎯 **Current Location** - Highlights user's current country with animated border
 - 💬 **Tooltips** - Hover over countries to see names
 - ✨ **Smooth Animations** - CSS transitions for all interactions
@@ -69,6 +71,40 @@ map_color: '#d0d0d0'
 | `map_color` | string | `#d0d0d0` | Color for non-visited countries |
 | `title` | string | `Countries Visited` | Card title |
 
+## Sensors
+
+The integration creates two sensor entities for each configured person:
+
+### `sensor.countries_visited_{person_name}`
+
+Main sensor tracking visited countries.
+
+**State**: Number of visited countries
+
+**Attributes**:
+- `visited_countries`: List of ISO country codes (e.g., `["US", "GB", "DE"]`)
+- `visited_countries_names`: List of country names (e.g., `["United States", "United Kingdom", "Germany"]`)
+- `person`: Person entity ID being tracked
+- `detected_from_history`: Countries automatically detected from history
+- `manual_countries`: Countries manually added via services
+- `current_country`: Current country code based on person's GPS location
+
+### `sensor.geocoding_cache_statistics_{entry_id}`
+
+Cache performance sensor for reverse geocoding.
+
+**State**: Cache hit rate (percentage)
+
+**Attributes**:
+- `cache_size`: Number of cached coordinate entries
+- `cache_hits`: Number of times cache was used (no API call needed)
+- `cache_misses`: Number of times API was called
+- `api_calls`: Total API calls made to Nominatim
+- `total_requests`: Total geocoding requests processed
+- `hit_rate`: Cache hit rate percentage
+
+**Example**: A hit rate of 85% means 85% of geocoding requests were served from cache, reducing API calls by 85%.
+
 ## Services
 
 ### `countries_visited.add_country`
@@ -113,12 +149,38 @@ data:
 The integration can automatically detect countries from:
 - `device_tracker` history with GPS coordinates
 - Home Assistant zones with latitude/longitude
+- Current GPS location from person entities
+
+### Reverse Geocoding
+
+The integration uses **reverse geocoding** to convert GPS coordinates (latitude/longitude) into country codes. This is powered by:
+
+- **Nominatim** (OpenStreetMap) - Free, open-source geocoding service
+- **No API key required** - Works out of the box
+- **Intelligent caching** - Coordinates are cached to minimize API calls
+- **Rate limiting** - Respects Nominatim's 1 request/second limit
+
+#### How it works:
+
+1. The integration extracts GPS coordinates from:
+   - Device tracker history states
+   - Zone coordinates when a person enters a zone
+   - Current location from person entity attributes
+
+2. Coordinates are rounded to ~1km precision for efficient caching
+
+3. Each unique coordinate is reverse geocoded to determine the country code
+
+4. Results are cached to avoid redundant API calls
 
 ### Setting up automatic tracking
 
-1. Ensure you have zones defined for each location
-2. The integration will automatically detect when a person enters a zone
-3. Country codes are resolved from zone coordinates
+1. Ensure your person entities have GPS coordinates (latitude/longitude attributes)
+2. The integration will automatically process history and detect countries
+3. Country codes are resolved from coordinates using reverse geocoding
+4. Results are cached for future use
+
+**Note**: Processing large amounts of history may take time due to rate limiting. The integration processes up to 100 unique coordinates per update to prevent timeouts.
 
 ## Country Codes
 

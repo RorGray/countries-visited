@@ -1,10 +1,8 @@
 """Sensor platform for Countries Visited."""
 from __future__ import annotations
 
-from datetime import timedelta
-import json
+import asyncio
 import logging
-import os
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
@@ -16,65 +14,168 @@ from .const import CONF_PERSON, DOMAIN, ISO_TO_NAME
 
 _LOGGER = logging.getLogger(__name__)
 
-# Cache for loaded country data
-_COUNTRIES_DATA_CACHE = None
-_COUNTRIES_DATA_PATH = "www/community/countries-visited/dist/countries-data.json"
+# Callbacks for cache statistics sensors to update
+_cache_stats_callbacks = []
+
+# Cache for reverse geocoding results (lat,lon -> country_code)
+_COORDINATE_CACHE = {}
+
+# Cache statistics
+_CACHE_STATS = {
+    "cache_hits": 0,
+    "cache_misses": 0,
+    "api_calls": 0,
+    "total_requests": 0,
+}
+
+# Reverse geocoder instance (lazy loaded)
+_reverse_geocoder = None
 
 
-def _load_countries_data(hass):
-    """Load country data from JSON file."""
-    global _COUNTRIES_DATA_CACHE
-    if _COUNTRIES_DATA_CACHE is not None:
-        return _COUNTRIES_DATA_CACHE
+def _get_reverse_geocoder():
+    """Get or create reverse geocoder instance."""
+    global _reverse_geocoder
+    if _reverse_geocoder is None:
+        try:
+            from geopy.geocoders import Nominatim
+            from geopy.exc import GeocoderTimedOut, GeocoderServiceError
+            
+            # Use Nominatim (OpenStreetMap) - free, no API key required
+            _reverse_geocoder = Nominatim(user_agent="home-assistant-countries-visited")
+            _LOGGER.info("Initialized reverse geocoder for country detection")
+        except ImportError:
+            _LOGGER.error(
+                "geopy library not installed. Install it with: pip install geopy"
+            )
+            _reverse_geocoder = False  # Mark as unavailable
+        except Exception as err:
+            _LOGGER.warning("Failed to initialize reverse geocoder: %s", err)
+            _reverse_geocoder = False
     
-    try:
-        config_path = hass.config.path(_COUNTRIES_DATA_PATH)
-        if os.path.exists(config_path):
-            with open(config_path, 'r') as f:
-                data = json.load(f)
-            # Convert to dict for faster lookup: {code: {lat, lon, radius}}
-            _COUNTRIES_DATA_CACHE = {
-                c["id"]: {"lat": c["lat"], "lon": c["lon"], "radius": c["radius"]}
-                for c in data
-                if "lat" in c and "lon" in c and "radius" in c
-            }
-            _LOGGER.info("Loaded %d countries from data file", len(_COUNTRIES_DATA_CACHE))
-            return _COUNTRIES_DATA_CACHE
-    except Exception as err:
-        _LOGGER.warning("Failed to load countries data from file: %s", err)
-    
-    return {}
+    return _reverse_geocoder if _reverse_geocoder is not False else None
 
 
-def haversine_distance(lat1, lon1, lat2, lon2):
-    """Calculate distance between two points in kilometers using Haversine formula."""
-    import math
-    
-    R = 6371  # Earth's radius in km
-    
-    lat1_rad = math.radians(lat1)
-    lat2_rad = math.radians(lat2)
-    delta_lat = math.radians(lat2 - lat1)
-    delta_lon = math.radians(lon2 - lon1)
-    
-    a = (math.sin(delta_lat / 2) ** 2 +
-         math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(delta_lon / 2) ** 2)
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    
-    return R * c
+def _notify_cache_stats_updated(hass: HomeAssistant):
+    """Notify all cache statistics sensors to update."""
+    for callback_func in _cache_stats_callbacks:
+        try:
+            callback_func()
+        except Exception as err:
+            _LOGGER.debug("Error notifying cache stats sensor: %s", err)
 
 
-def get_country_from_coords(hass, lat, lon):
-    """Determine country code from GPS coordinates using data from file."""
-    country_boundaries = _load_countries_data(hass)
-    if not country_boundaries:
+def get_cache_stats():
+    """Get current cache statistics."""
+    cache_size = len(_COORDINATE_CACHE)
+    total_requests = _CACHE_STATS["total_requests"]
+    cache_hits = _CACHE_STATS["cache_hits"]
+    cache_misses = _CACHE_STATS["cache_misses"]
+    api_calls = _CACHE_STATS["api_calls"]
+    
+    # Calculate hit rate (percentage)
+    hit_rate = (cache_hits / total_requests * 100) if total_requests > 0 else 0.0
+    
+    return {
+        "cache_size": cache_size,
+        "cache_hits": cache_hits,
+        "cache_misses": cache_misses,
+        "api_calls": api_calls,
+        "total_requests": total_requests,
+        "hit_rate": round(hit_rate, 2),
+    }
+
+
+async def get_country_from_coords(hass, lat, lon):
+    """Determine country code from GPS coordinates using reverse geocoding.
+    
+    Uses caching to avoid excessive API calls. Coordinates are rounded to ~1km
+    precision for caching efficiency.
+    
+    Note: Nominatim (OpenStreetMap) has rate limits:
+    - 1 request per second (free tier)
+    - Please be respectful of their service
+    """
+    # Round coordinates to ~1km precision for caching (0.01° ≈ 1km)
+    cache_key = (round(lat, 2), round(lon, 2))
+    
+    # Update statistics
+    _CACHE_STATS["total_requests"] += 1
+    
+    # Check cache first
+    if cache_key in _COORDINATE_CACHE:
+        cached_result = _COORDINATE_CACHE[cache_key]
+        _CACHE_STATS["cache_hits"] += 1
+        _LOGGER.debug("Using cached country for (%s, %s): %s", lat, lon, cached_result)
+        # Notify cache statistics sensors to update
+        _notify_cache_stats_updated(hass)
+        return cached_result
+    
+    # Cache miss - will need API call
+    _CACHE_STATS["cache_misses"] += 1
+    
+    geocoder = _get_reverse_geocoder()
+    if not geocoder:
+        _LOGGER.debug("Reverse geocoder not available, cannot determine country")
+        # Notify cache statistics sensors to update (even though no API call was made)
+        _notify_cache_stats_updated(hass)
         return None
     
-    for code, data in country_boundaries.items():
-        distance = haversine_distance(lat, lon, data["lat"], data["lon"])
-        if distance <= data["radius"]:
-            return code
-    return None
+    try:
+        # Use async executor to avoid blocking
+        from geopy.exc import GeocoderTimedOut, GeocoderServiceError
+        import time
+        
+        def reverse_geocode():
+            try:
+                # Add delay to respect Nominatim rate limits (1 req/sec)
+                # Note: This is a simple approach; for production, consider a proper rate limiter
+                time.sleep(1.1)
+                
+                location = geocoder.reverse((lat, lon), exactly_one=True, timeout=10)
+                if location and location.raw:
+                    address = location.raw.get("address", {})
+                    country_code = address.get("country_code", "").upper()
+                    if country_code and len(country_code) == 2:
+                        return country_code
+                    else:
+                        _LOGGER.debug(
+                            "Invalid country code from geocoding: %s", country_code
+                        )
+            except (GeocoderTimedOut, GeocoderServiceError) as e:
+                _LOGGER.debug("Geocoding error for (%s, %s): %s", lat, lon, e)
+                return None
+            except Exception as e:
+                _LOGGER.warning("Unexpected geocoding error: %s", e)
+                return None
+            return None
+        
+        country_code = await hass.async_add_executor_job(reverse_geocode)
+        
+        # Track API call
+        _CACHE_STATS["api_calls"] += 1
+        
+        # Cache the result (both success and failure)
+        _COORDINATE_CACHE[cache_key] = country_code
+        
+        if country_code:
+            _LOGGER.debug("Resolved (%s, %s) to country: %s", lat, lon, country_code)
+        else:
+            _LOGGER.debug("Could not resolve country for (%s, %s)", lat, lon)
+        
+        # Notify cache statistics sensors to update
+        _notify_cache_stats_updated(hass)
+        
+        return country_code
+            
+    except Exception as err:
+        _LOGGER.warning("Error reverse geocoding coordinates (%s, %s): %s", lat, lon, err)
+        # Track API call attempt
+        _CACHE_STATS["api_calls"] += 1
+        # Cache the error to avoid retrying immediately
+        _COORDINATE_CACHE[cache_key] = None
+        # Notify cache statistics sensors to update
+        _notify_cache_stats_updated(hass)
+        return None
 
 
 async def async_setup_entry(
@@ -84,7 +185,8 @@ async def async_setup_entry(
     person_entity = entry.data[CONF_PERSON]
     
     sensor = CountriesVisitedSensor(hass, entry)
-    async_add_entities([sensor])
+    cache_stats_sensor = CacheStatisticsSensor(hass, entry)
+    async_add_entities([sensor, cache_stats_sensor])
 
     # Listen for person state changes to detect new locations
     @callback
@@ -171,7 +273,7 @@ class CountriesVisitedSensor(SensorEntity):
         if lat is None or lon is None:
             return None
         
-        return get_country_from_coords(self.hass, lat, lon)
+        return await get_country_from_coords(self.hass, lat, lon)
 
     async def _detect_countries_from_history(self, person_entity):
         """Detect countries from device_tracker history."""
@@ -201,15 +303,16 @@ class CountriesVisitedSensor(SensorEntity):
                     _LOGGER.debug("Could not fetch history")
                     return list(detected)
             
+            # Process states in batches to avoid too many API calls
+            coordinates_to_resolve = []
+            
             for state in states:
                 # Check if state has GPS coordinates
                 lat = state.attributes.get("latitude")
                 lon = state.attributes.get("longitude")
                 
                 if lat is not None and lon is not None:
-                    country_code = get_country_from_coords(self.hass, lat, lon)
-                    if country_code:
-                        detected.add(country_code)
+                    coordinates_to_resolve.append((lat, lon))
                 
                 # Also check zone information
                 if state.state and state.state.startswith("zone."):
@@ -219,11 +322,88 @@ class CountriesVisitedSensor(SensorEntity):
                         zone_lat = zone_state.attributes.get("latitude")
                         zone_lon = zone_state.attributes.get("longitude")
                         if zone_lat is not None and zone_lon is not None:
-                            country_code = get_country_from_coords(self.hass, zone_lat, zone_lon)
-                            if country_code:
-                                detected.add(country_code)
+                            coordinates_to_resolve.append((zone_lat, zone_lon))
+            
+            # Resolve coordinates to countries (with caching and rate limiting)
+            # Process unique coordinates only to minimize API calls
+            unique_coords = list(set(coordinates_to_resolve))
+            _LOGGER.debug(
+                "Processing %d unique coordinates from history (total: %d)",
+                len(unique_coords),
+                len(coordinates_to_resolve)
+            )
+            
+            # Limit processing to avoid excessive API calls
+            # Process max 100 coordinates per update to avoid timeouts
+            max_coords = 100
+            if len(unique_coords) > max_coords:
+                _LOGGER.info(
+                    "Limiting history processing to %d coordinates (found %d). "
+                    "Consider running detection periodically rather than on every update.",
+                    max_coords,
+                    len(unique_coords)
+                )
+                unique_coords = unique_coords[:max_coords]
+            
+            for lat, lon in unique_coords:
+                country_code = await get_country_from_coords(self.hass, lat, lon)
+                if country_code:
+                    detected.add(country_code)
+                # Small delay between calls (in addition to rate limiting in get_country_from_coords)
+                await asyncio.sleep(0.1)
                                 
         except Exception as err:
             _LOGGER.warning("Error detecting countries from history: %s", err)
         
         return list(detected)
+
+
+class CacheStatisticsSensor(SensorEntity):
+    """Sensor to track geocoding cache statistics."""
+
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry):
+        self.hass = hass
+        self._entry = entry
+        self._attr_icon = "mdi:chart-line"
+        self._attr_extra_state_attributes = {}
+        
+        # Register callback for cache updates
+        def update_callback():
+            self.async_schedule_update_ha_state(True)
+        
+        _cache_stats_callbacks.append(update_callback)
+        
+        # Store callback for cleanup
+        self._update_callback = update_callback
+        
+    @property
+    def name(self):
+        """Return the name of the sensor."""
+        return "Geocoding Cache Statistics"
+    
+    @property
+    def unique_id(self):
+        """Return unique ID."""
+        return f"geocoding_cache_stats_{self._entry.entry_id}"
+    
+    async def async_will_remove_from_hass(self):
+        """Clean up callback when entity is removed."""
+        if self._update_callback in _cache_stats_callbacks:
+            _cache_stats_callbacks.remove(self._update_callback)
+    
+    async def async_update(self):
+        """Update the sensor state with cache statistics."""
+        stats = get_cache_stats()
+        
+        # Use hit rate as the main value
+        self._attr_native_value = stats["hit_rate"]
+        self._attr_native_unit_of_measurement = "%"
+        
+        self._attr_extra_state_attributes = {
+            "cache_size": stats["cache_size"],
+            "cache_hits": stats["cache_hits"],
+            "cache_misses": stats["cache_misses"],
+            "api_calls": stats["api_calls"],
+            "total_requests": stats["total_requests"],
+            "hit_rate": stats["hit_rate"],
+        }
