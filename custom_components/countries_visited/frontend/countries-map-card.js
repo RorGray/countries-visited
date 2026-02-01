@@ -1,7 +1,29 @@
-import { loadCountriesData } from './map-data.js';
-
 // Card version
 const CARD_VERSION = '0.1';
+
+// Dynamic import for map-data.js with version tag
+async function loadMapDataModule() {
+  const moduleBaseUrl = new URL('.', import.meta.url);
+  const mapDataUrl = new URL('map-data.js', moduleBaseUrl);
+  const mapDataPaths = [
+    `/hacsfiles/countries-visited/map-data.js?v=${CARD_VERSION}`,
+    `${mapDataUrl.href}?v=${CARD_VERSION}`
+  ];
+  
+  // Try each path until one succeeds
+  for (const path of mapDataPaths) {
+    try {
+      const module = await import(path);
+      return module;
+    } catch (error) {
+      // Try next path
+      continue;
+    }
+  }
+  
+  // Fallback to relative import without version (for development)
+  return import('./map-data.js');
+}
 
 // Styled console logging helper
 const logStyle = {
@@ -37,15 +59,13 @@ let _versionLogged = false;
 let _cssLoading = false;
 let _cssLoaded = false;
 let _cssLoadPromise = null;
+let _cssText = null; // Store CSS text once loaded
 
 // Module-level CSS loading function (shared across all card instances)
 function loadCardCSS() {
   // If already loaded, return immediately
-  if (_cssLoaded) {
-    const existingStyle = document.getElementById('countries-map-card-styles');
-    if (existingStyle) {
-      return Promise.resolve();
-    }
+  if (_cssLoaded && _cssText) {
+    return Promise.resolve(_cssText);
   }
   
   // If currently loading, return the existing promise
@@ -91,24 +111,12 @@ function loadCardCSS() {
       return;
     }
     
-    // Check if style tag already exists (shouldn't happen, but be safe)
-    let styleTag = document.getElementById('countries-map-card-styles');
-    if (!styleTag) {
-      // Create and inject style tag
-      styleTag = document.createElement('style');
-      styleTag.id = 'countries-map-card-styles';
-      styleTag.type = 'text/css';
-      styleTag.textContent = cssText;
-      document.head.appendChild(styleTag);
-    } else {
-      // Update existing style tag
-      styleTag.textContent = cssText;
-    }
-    
+    // Store CSS text for reuse
+    _cssText = cssText;
     _cssLoaded = true;
     _cssLoading = false;
     _cssLoadPromise = null;
-    resolve();
+    resolve(cssText);
   });
   
   return _cssLoadPromise;
@@ -120,6 +128,8 @@ class CountriesMapCard extends HTMLElement {
     // Store last rendered state to detect changes
     this._lastState = null;
     this._lastConfig = null;
+    // Track if style tag has been added to this card instance
+    this._styleTagAdded = false;
   }
 
   set hass(hass) {
@@ -221,12 +231,21 @@ class CountriesMapCard extends HTMLElement {
   async render() {
     if (!this._config || !this._hass) return;
 
-    // Wait for CSS to load before rendering to ensure styling is applied
-    try {
-      await loadCardCSS();
-    } catch (error) {
-      logWarn('CSS failed to load, card may appear unstyled:', error);
-      // Continue anyway - card should still work, just without styling
+    // Load CSS and inject style tag into this card (only once per card instance)
+    if (!this._styleTagAdded) {
+      try {
+        const cssText = await loadCardCSS();
+        // Create and inject style tag into this card element
+        const styleTag = document.createElement('style');
+        styleTag.type = 'text/css';
+        styleTag.textContent = cssText;
+        // Insert at the beginning of the card
+        this.insertBefore(styleTag, this.firstChild);
+        this._styleTagAdded = true;
+      } catch (error) {
+        logWarn('CSS failed to load, card may appear unstyled:', error);
+        // Continue anyway - card should still work, just without styling
+      }
     }
 
     let entity = this._config.entity || this._config.person;
@@ -320,7 +339,11 @@ class CountriesMapCard extends HTMLElement {
         }
         
         // If error was already thrown, show a simple message in the card instead
-        this.innerHTML = `
+        // Preserve the style tag when setting innerHTML
+        const existingStyleTag = this.querySelector('style');
+        const styleTagContent = existingStyleTag ? existingStyleTag.outerHTML : '';
+        
+        this.innerHTML = styleTagContent + `
           <div class="countries-card">
             <div class="card-header">
               <div class="card-title">Countries Visited</div>
@@ -351,10 +374,15 @@ class CountriesMapCard extends HTMLElement {
     const visitedCountries = stateObj?.attributes?.visited_countries || [];
     const currentCountry = stateObj?.attributes?.current_country || null;
 
-    // Load countries data
-    const countries = await loadCountriesData();
+    // Load countries data (with version tag)
+    const mapDataModule = await loadMapDataModule();
+    const countries = await mapDataModule.loadCountriesData();
 
-    this.innerHTML = `
+    // Preserve the style tag when setting innerHTML
+    const existingStyleTag = this.querySelector('style');
+    const styleTagContent = existingStyleTag ? existingStyleTag.outerHTML : '';
+
+    this.innerHTML = styleTagContent + `
       <div class="countries-card">
         <div class="card-header">
           <div class="card-title">
