@@ -17,7 +17,25 @@ class CountriesMapCard extends HTMLElement {
   async render() {
     if (!this._config || !this._hass) return;
 
-    const entity = this._config.entity || this._config.person;
+    let entity = this._config.entity || this._config.person;
+    
+    // If entity is a person entity, automatically find the corresponding sensor entity
+    if (entity && entity.startsWith('person.')) {
+      // Find the sensor entity for this person
+      // The sensor entity has the person entity ID in its attributes
+      const sensorEntityId = Object.keys(this._hass.states).find(
+        stateId => stateId.startsWith('sensor.countries_visited_') &&
+                   this._hass.states[stateId]?.attributes?.person === entity
+      );
+      
+      if (sensorEntityId) {
+        entity = sensorEntityId;
+        console.debug(`Countries Map Card: Found sensor entity ${sensorEntityId} for person ${this._config.entity || this._config.person}`);
+      } else {
+        console.warn(`Countries Map Card: Could not find sensor entity for person ${entity}. Make sure the integration is set up for this person.`);
+      }
+    }
+    
     const visitedColor = this._config.visited_color || '#4CAF50';
     const mapColor = this._config.map_color || '#d0d0d0';
     const currentColor = this._config.current_color || '#FF5722';

@@ -55,17 +55,19 @@ Add the card to your dashboard:
 
 ```yaml
 type: custom:countries-map-card
-entity: person.your_name
+entity: sensor.countries_visited_person_your_name
 visited_color: '#4CAF50'
 map_color: '#d0d0d0'
 ```
+
+**Note**: The card accepts either the sensor entity (`sensor.countries_visited_*`) or the person entity (`person.*`). If you provide a person entity, the card will automatically find the corresponding sensor entity.
 
 ### Card Options
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `entity` | string | Required | Person entity ID to track |
-| `person` | string | Optional | Alias for entity |
+| `entity` | string | Required | Sensor entity ID (`sensor.countries_visited_*`) or person entity ID (`person.*`) |
+| `person` | string | Optional | Alias for entity (deprecated, use `entity` instead) |
 | `visited_color` | string | `#4CAF50` | Color for visited countries |
 | `current_color` | string | `#FF5722` | Color for current location |
 | `map_color` | string | `#d0d0d0` | Color for non-visited countries |
@@ -198,12 +200,12 @@ You can create multiple cards for different people:
 ```yaml
 # Card for person 1
 type: custom:countries-map-card
-entity: person.alice
+entity: sensor.countries_visited_person_alice
 title: Alice's Travels
 
 # Card for person 2  
 type: custom:countries-map-card
-entity: person.bob
+entity: sensor.countries_visited_person_bob
 title: Bob's Travels
 ```
 
