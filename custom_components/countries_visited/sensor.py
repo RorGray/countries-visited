@@ -233,21 +233,30 @@ class CountriesVisitedSensor(SensorEntity):
         
         state = self.hass.states.get(person_entity)
         if not state:
+            _LOGGER.warning(f"Person entity {person_entity} not found")
             return
         
         # Get manually tracked countries from entity attributes
         manual_countries = list(state.attributes.get("visited_countries", []))
+        _LOGGER.debug(f"Manual countries from {person_entity}: {manual_countries}")
         
         # Detect countries from history
         history_countries = await self._detect_countries_from_history(person_entity)
+        _LOGGER.info(f"Detected {len(history_countries)} countries from history: {history_countries}")
         
         # Merge countries (manual + detected)
         visited_countries = list(set(manual_countries + history_countries))
         visited_countries.sort()
         
+        _LOGGER.info(
+            f"Total visited countries for {person_entity}: {len(visited_countries)} "
+            f"(manual: {len(manual_countries)}, detected: {len(history_countries)})"
+        )
+        
         # Update state only if changed
         if visited_countries != self._last_visited_countries:
             self._last_visited_countries = visited_countries
+            _LOGGER.info(f"Countries list updated: {visited_countries}")
             
         # Get country names for display
         country_names = [
@@ -256,6 +265,8 @@ class CountriesVisitedSensor(SensorEntity):
         
         # Get current location for current country detection
         current_country = await self._get_current_country(person_entity)
+        if current_country:
+            _LOGGER.debug(f"Current country for {person_entity}: {current_country}")
         
         self._attr_native_value = len(visited_countries)
         self._attr_extra_state_attributes = {
@@ -266,6 +277,8 @@ class CountriesVisitedSensor(SensorEntity):
             "manual_countries": manual_countries,
             "current_country": current_country,
         }
+        
+        _LOGGER.debug(f"Sensor updated - state: {self._attr_native_value}, attributes: {self._attr_extra_state_attributes}")
 
     async def _get_current_country(self, person_entity):
         """Get the current country based on person's current GPS location."""
@@ -351,17 +364,28 @@ class CountriesVisitedSensor(SensorEntity):
                 )
                 unique_coords = unique_coords[:max_coords]
             
+            detected_count = 0
             for lat, lon in unique_coords:
                 country_code = await get_country_from_coords(self.hass, lat, lon)
                 if country_code:
                     detected.add(country_code)
+                    detected_count += 1
+                    _LOGGER.debug(f"Detected country {country_code} from coordinates ({lat}, {lon})")
                 # Small delay between calls (in addition to rate limiting in get_country_from_coords)
                 await asyncio.sleep(0.1)
+            
+            _LOGGER.info(
+                f"History processing complete for {person_entity}: "
+                f"{detected_count} countries detected from {len(unique_coords)} coordinates, "
+                f"total unique countries: {len(detected)}"
+            )
                                 
         except Exception as err:
-            _LOGGER.warning("Error detecting countries from history: %s", err)
+            _LOGGER.warning("Error detecting countries from history: %s", err, exc_info=True)
         
-        return list(detected)
+        result = list(detected)
+        _LOGGER.debug(f"Returning {len(result)} detected countries: {result}")
+        return result
 
 
 class CacheStatisticsSensor(SensorEntity):

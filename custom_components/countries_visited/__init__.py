@@ -29,22 +29,46 @@ def _setup_file_logging(hass: HomeAssistant):
     try:
         log_file = hass.config.path("countries_visited.log")
         
+        # Get the root logger for the domain (this will catch all child loggers)
+        root_logger = logging.getLogger(f"custom_components.{DOMAIN}")
+        
+        # Set logger level to DEBUG to capture all messages
+        root_logger.setLevel(logging.DEBUG)
+        
         # Create file handler
-        file_handler = logging.FileHandler(log_file, encoding="utf-8")
+        file_handler = logging.FileHandler(log_file, encoding="utf-8", mode="a")
         file_handler.setLevel(logging.DEBUG)
         
         # Create formatter
         formatter = logging.Formatter(
-            "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+            "%(asctime)s [%(levelname)-8s] %(name)s: %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S"
         )
         file_handler.setFormatter(formatter)
         
-        # Add handler to logger
-        _LOGGER.addHandler(file_handler)
+        # Prevent duplicate handlers - remove any existing file handlers for this log file
+        existing_handlers = [h for h in root_logger.handlers if isinstance(h, logging.FileHandler)]
+        for handler in existing_handlers:
+            try:
+                if os.path.abspath(handler.baseFilename) == os.path.abspath(log_file):
+                    root_logger.removeHandler(handler)
+                    handler.close()
+            except (AttributeError, OSError):
+                pass
+        
+        # Add handler to root logger
+        root_logger.addHandler(file_handler)
         _log_file_handler = file_handler
         
-        _LOGGER.info(f"Countries Visited logging to file: {log_file}")
+        # Ensure propagation is enabled (default, but make sure)
+        root_logger.propagate = True
+        
+        # Write initial message to confirm logging works
+        root_logger.info(f"Countries Visited file logging initialized: {log_file}")
+        root_logger.info("=" * 80)
+        root_logger.info("Countries Visited Integration Log")
+        root_logger.info("=" * 80)
+        
     except Exception as e:
         # Don't fail setup if logging can't be configured
         logging.getLogger(__name__).warning(f"Could not set up file logging: {e}")
@@ -93,10 +117,11 @@ def copy_frontend_files(hass: HomeAssistant):
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up a skeleton component."""
-    _LOGGER.info("Setting up Countries Visited integration (global setup)")
-    
-    # Set up optional file logging
+    # Set up optional file logging FIRST, before any other logging
     await hass.async_add_executor_job(_setup_file_logging, hass)
+    
+    _LOGGER.info("Setting up Countries Visited integration (global setup)")
+    _LOGGER.debug("File logging should now be active - check countries_visited.log")
 
     # Ensure frontend files exist on every Home Assistant startup
     await hass.async_add_executor_job(ensure_directory, hass)
