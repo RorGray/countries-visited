@@ -17,6 +17,9 @@ class CountriesMapCard extends HTMLElement {
   async render() {
     if (!this._config || !this._hass) return;
 
+    // Load CSS first, before any early returns, so styling is always applied
+    this._loadCSS();
+
     let entity = this._config.entity || this._config.person;
     
     // If entity is a person entity, automatically find the corresponding sensor entity
@@ -133,9 +136,6 @@ class CountriesMapCard extends HTMLElement {
 
     // Load countries data
     const countries = await loadCountriesData();
-
-    // Load CSS if not already loaded
-    this._loadCSS();
 
     this.innerHTML = `
       <div class="countries-card">
