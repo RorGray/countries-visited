@@ -312,7 +312,8 @@ class CountriesVisitedSensor(SensorEntity):
             # Use REST API to get entity history (avoids blocking call issues)
             from datetime import datetime, timedelta
             from homeassistant.helpers.aiohttp_client import async_get_clientsession
-            from urllib.parse import quote, urlencode
+            from urllib.parse import quote
+            import json
             
             # Get history from last 365 days
             end_time = datetime.now()
@@ -322,45 +323,47 @@ class CountriesVisitedSensor(SensorEntity):
             start_time_str = start_time.isoformat()
             end_time_str = end_time.isoformat()
             
-            # Use Home Assistant's internal HTTP client to call the history API
-            # Use localhost for internal calls (bypasses external URL/auth requirements)
-            session = async_get_clientsession(self.hass)
+            # Use internal API mechanism to bypass authentication
+            # Call the history API handler directly through hass.http.app
+            from aiohttp import web
+            from homeassistant.components.history import HistoryPeriodView
             
-            # Build API URL with query parameters
-            # Use localhost:8123 (default HA port) or get from config
-            base_url = self.hass.config.internal_url or f"http://localhost:{self.hass.config.api.port or 8123}"
-            api_url = f"{base_url}/api/history/period/{quote(start_time_str)}"
+            # Build API path with timestamp
+            api_path = f"/api/history/period/{quote(start_time_str)}"
+            
+            # Build query parameters
             query_params = {
                 "filter_entity_id": person_entity,
                 "end_time": end_time_str,
             }
-            api_url_with_params = f"{api_url}?{urlencode(query_params)}"
             
             try:
-                # Make internal API call using Home Assistant's HTTP client
-                # For internal calls, we can use a bearer token or rely on internal URL
-                headers = {}
-                # Try to get a token from the system if available
-                if hasattr(self.hass.auth, 'async_get_or_create_owner_token'):
-                    # This is an internal call, so we might not need auth
-                    # But if we do, we can add it here
-                    pass
+                # Create internal request object for the history API handler
+                # This bypasses authentication for internal calls
+                internal_request = web.Request(
+                    method="GET",
+                    path=api_path,
+                    headers={},
+                    match_info={"timestamp": start_time_str},
+                    query=query_params,
+                )
                 
-                async with session.get(api_url_with_params, headers=headers) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                    elif response.status == 401:
-                        _LOGGER.warning(
-                            f"History API authentication failed for {person_entity}. "
-                            "History detection requires authentication. "
-                            "This feature may not work without proper internal API access."
-                        )
-                        return list(detected)
-                    else:
-                        _LOGGER.warning(
-                            f"History API returned status {response.status} for {person_entity}"
-                        )
-                        return list(detected)
+                # Set the app reference so the handler can access hass
+                internal_request._app = self.hass.http.app
+                
+                # Call the HistoryPeriodView handler directly
+                # This is an internal call that bypasses HTTP authentication
+                handler = HistoryPeriodView()
+                response = await handler.get(internal_request)
+                
+                # Extract JSON from response
+                if response.status == 200:
+                    data = await response.json()
+                else:
+                    _LOGGER.warning(
+                        f"History API returned status {response.status} for {person_entity}"
+                    )
+                    return list(detected)
                     
             except Exception as internal_error:
                 _LOGGER.warning(
