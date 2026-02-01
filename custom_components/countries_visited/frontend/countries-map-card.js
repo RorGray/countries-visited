@@ -87,11 +87,12 @@ function loadCardCSS() {
     link.type = 'text/css';
     
     // Try HACS path first, then module-relative fallback
+    // Add version to prevent caching
     const moduleBaseUrl = new URL('.', import.meta.url);
     const cssUrl = new URL('countries-map-card.css', moduleBaseUrl);
     const cssPaths = [
-      '/hacsfiles/countries-visited/countries-map-card.css',
-      cssUrl.href
+      `/hacsfiles/countries-visited/countries-map-card.css?v=${CARD_VERSION}`,
+      `${cssUrl.href}?v=${CARD_VERSION}`
     ];
     
     let currentPathIndex = 0;

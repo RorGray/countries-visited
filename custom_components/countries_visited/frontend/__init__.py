@@ -88,8 +88,9 @@ class CountriesVisitedCardRegistration:
             url = f"{URL_BASE}/{card.get('filename')}"
             versioned_url = f"{url}?v={card.get('version')}"
 
+            # Register JS files as modules, CSS files are loaded dynamically by the card
             if not url.endswith(".js"):
-                _LOGGER.debug("Skipping non-JS file: %s", url)
+                _LOGGER.debug("Skipping non-JS file (will be loaded dynamically): %s", url)
                 continue
 
             # Check if already registered with correct version

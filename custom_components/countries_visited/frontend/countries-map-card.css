@@ -1,4 +1,5 @@
-.countries-card {
+/* Scope all styles to the custom element for higher specificity */
+countries-map-card .countries-card {
   background: var(--card-background-color, #fff);
   border-radius: 16px;
   padding: 20px;
@@ -6,7 +7,7 @@
   font-family: var(--primary-font-family, system-ui);
 }
 
-.card-header {
+countries-map-card .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -15,7 +16,7 @@
   border-bottom: 1px solid var(--divider-color, #e5e5e5);
 }
 
-.card-title {
+countries-map-card .card-title {
   font-size: 20px;
   font-weight: 600;
   color: var(--primary-text-color, #1a1a1a);
@@ -24,19 +25,19 @@
   gap: 10px;
 }
 
-.card-stats {
+countries-map-card .card-stats {
   font-size: 14px;
   color: var(--secondary-text-color, #666);
   padding: 8px 16px;
   border-radius: 20px;
 }
 
-.card-stats strong {
+countries-map-card .card-stats strong {
   font-size: 18px;
   font-weight: 700;
 }
 
-.current-badge {
+countries-map-card .current-badge {
   font-size: 12px;
   padding: 4px 10px;
   border-radius: 12px;
@@ -46,11 +47,11 @@
   gap: 4px;
 }
 
-.current-badge:not(.visible) {
+countries-map-card .current-badge:not(.visible) {
   display: none;
 }
 
-.map-container {
+countries-map-card .map-container {
   position: relative;
   width: 100%;
   background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
@@ -58,30 +59,30 @@
   overflow: hidden;
 }
 
-.map-container svg {
+countries-map-card .map-container svg {
   width: 100%;
   height: auto;
   display: block;
 }
 
-.country {
+countries-map-card .country {
   stroke: var(--card-background-color, #fff);
   stroke-width: 0.5;
   transition: fill 0.3s ease, opacity 0.2s ease, stroke-width 0.2s ease;
   cursor: pointer;
 }
 
-.country.visited {
+countries-map-card .country.visited {
   /* fill set dynamically */
 }
 
-.country.current {
+countries-map-card .country.current {
   /* fill and stroke set dynamically */
   stroke-width: 2;
   animation: pulse-border 2s infinite;
 }
 
-.country:hover {
+countries-map-card .country:hover {
   opacity: 0.85;
   stroke-width: 1;
   filter: brightness(1.1);
@@ -96,7 +97,7 @@
   }
 }
 
-.tooltip {
+countries-map-card .tooltip {
   position: absolute;
   background: var(--card-background-color, #fff);
   color: var(--primary-text-color, #1a1a1a);
@@ -113,11 +114,11 @@
   margin-top: -8px;
 }
 
-.tooltip.visible {
+countries-map-card .tooltip.visible {
   opacity: 1;
 }
 
-.legend {
+countries-map-card .legend {
   display: flex;
   gap: 16px;
   margin-top: 12px;
@@ -128,26 +129,26 @@
   flex-wrap: wrap;
 }
 
-.legend-item {
+countries-map-card .legend-item {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.legend-color {
+countries-map-card .legend-color {
   width: 16px;
   height: 10px;
   border-radius: 2px;
 }
 
-.country-tags {
+countries-map-card .country-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 12px;
 }
 
-.country-tag {
+countries-map-card .country-tag {
   padding: 4px 10px;
   border-radius: 12px;
   font-size: 12px;

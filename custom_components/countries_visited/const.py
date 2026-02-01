@@ -1,4 +1,7 @@
 """Constants for Countries Visited."""
+import json
+from pathlib import Path
+
 DOMAIN = "countries_visited"
 PLATFORMS = ["sensor", "binary_sensor"]
 
@@ -12,19 +15,39 @@ CONF_ACCESS_TOKEN = "access_token"
 DEFAULT_MAP_COLOR = "#e0e0e0"
 DEFAULT_VISITED_COLOR = "#4CAF50"
 
+# Get version from manifest.json (single source of truth)
+def _get_version():
+    """Get version from manifest.json."""
+    try:
+        manifest_path = Path(__file__).parent / "manifest.json"
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            manifest = json.load(f)
+            version = manifest.get("version", "0.1")
+            # Remove 'v' prefix if present (manifest has "v0.1", we want "0.1")
+            return version.lstrip("v")
+    except Exception:
+        return "0.1"  # Fallback version
+
+FRONTEND_VERSION = _get_version()
+
 # Frontend constants
 URL_BASE = "/hacsfiles/countries-visited"
 COUNTRIES_VISITED_CARDS = [
     {
         "name": "Countries Map Data",
         "filename": "map-data.js",
-        "version": "0.1",
+        "version": FRONTEND_VERSION,
     },
     {
         "name": "Countries Map Card",
         "filename": "countries-map-card.js",
-        "version": "0.1",
-    }
+        "version": FRONTEND_VERSION,
+    },
+    {
+        "name": "Countries Map Card CSS",
+        "filename": "countries-map-card.css",
+        "version": FRONTEND_VERSION,
+    },
 ]
 
 # ISO country code mapping (partial - for key countries)
