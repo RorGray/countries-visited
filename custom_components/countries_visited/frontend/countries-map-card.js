@@ -219,9 +219,8 @@ class CountriesMapCard extends HTMLElement {
     };
   }
 
-  getCardSize() {
-    return 8; // Default card size (can be overridden in layout)
-  }
+  // Don't define getCardSize() - let the layout system control sizing
+  // The layout tab in Home Assistant will handle grid sizing
 
   _shouldUpdate() {
     if (!this._config || !this._hass) return false;
@@ -1159,37 +1158,58 @@ class CountriesMapCardEditor extends HTMLElement {
              entity.entity_id.startsWith('person.');
     };
 
-    // Entity picker
+    // Entity picker - wait for custom element to be defined
     const entityGroup = document.createElement('div');
     entityGroup.className = 'form-group';
-    const entityPicker = document.createElement('ha-entity-picker');
     
-    // Set properties
-    entityPicker.hass = this._hass;
-    entityPicker.value = currentEntity;
-    entityPicker.label = 'Entity';
-    entityPicker.includeDomains = ['sensor', 'person'];
-    entityPicker.entityFilter = entityFilter;
-    
-    entityPicker.addEventListener('value-changed', (ev) => {
-      this._config.entity = ev.detail.value || '';
-      this._fireConfigChanged();
-    });
-    
-    entityGroup.appendChild(entityPicker);
-    container.appendChild(entityGroup);
-    
-    // Ensure entity picker is properly initialized after being added to DOM
-    // Use requestAnimationFrame to ensure DOM is ready
-    requestAnimationFrame(() => {
-      if (entityPicker && entityPicker.hass !== this._hass) {
-        entityPicker.hass = this._hass;
+    // Wait for ha-entity-picker to be defined before creating it
+    const createEntityPicker = async () => {
+      // Wait for the custom element to be defined
+      if (!customElements.get('ha-entity-picker')) {
+        await customElements.whenDefined('ha-entity-picker');
       }
-      // Force update if it's a Lit element
+      
+      const entityPicker = document.createElement('ha-entity-picker');
+      
+      // Set properties after element is created
+      entityPicker.hass = this._hass;
+      entityPicker.value = currentEntity;
+      entityPicker.label = 'Entity';
+      entityPicker.includeDomains = ['sensor', 'person'];
+      entityPicker.entityFilter = entityFilter;
+      
+      entityPicker.addEventListener('value-changed', (ev) => {
+        this._config.entity = ev.detail.value || '';
+        this._fireConfigChanged();
+      });
+      
+      entityGroup.appendChild(entityPicker);
+      
+      // Ensure it updates after being added to DOM
+      if (entityPicker.updateComplete) {
+        await entityPicker.updateComplete;
+      }
+      entityPicker.hass = this._hass;
       if (entityPicker.requestUpdate) {
         entityPicker.requestUpdate();
       }
+    };
+    
+    createEntityPicker().catch(err => {
+      console.error('Failed to create entity picker:', err);
+      // Fallback: create a simple text input
+      const fallbackInput = document.createElement('ha-textfield');
+      fallbackInput.label = 'Entity';
+      fallbackInput.value = currentEntity;
+      fallbackInput.placeholder = 'sensor.countries_visited_... or person....';
+      fallbackInput.addEventListener('input', (ev) => {
+        this._config.entity = ev.target.value || '';
+        this._fireConfigChanged();
+      });
+      entityGroup.appendChild(fallbackInput);
     });
+    
+    container.appendChild(entityGroup);
 
     // Title field
     const titleGroup = document.createElement('div');
