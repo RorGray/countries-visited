@@ -5,6 +5,8 @@
 
 A Home Assistant integration to track and visualize countries visited by family members on an interactive world map.
 
+> 📋 See [CHANGELOG.md](CHANGELOG.md) for a detailed list of changes and new features.
+
 ## Features
 
 - 🌍 **Full World Map** - Interactive SVG map with 250+ countries and territories
@@ -15,9 +17,12 @@ A Home Assistant integration to track and visualize countries visited by family 
 - 🗺️ **Reverse Geocoding** - Converts GPS coordinates to country codes using Nominatim (OpenStreetMap)
 - 📈 **Cache Statistics** - Monitor geocoding cache performance with dedicated sensor
 - 🎯 **Current Location** - Highlights user's current country with animated border
-- 💬 **Tooltips** - Hover over countries to see names
+- 💬 **Rich Tooltips** - Hover over countries to see detailed information (name, region, population, sovereignty)
 - ✨ **Smooth Animations** - CSS transitions for all interactions
 - 🎯 **ISO 3166-1 alpha-2** - Standard country codes (US, GB, DE, FR, etc.)
+- 🖱️ **Interactive Map Controls** - Pan and zoom functionality with mouse, touch, and control buttons
+- 🌐 **Multi-Language Support** - German translations included, with support for additional languages
+- 🎛️ **Visual Editors** - Native Home Assistant UI editors for easy configuration (config flow and card editor)
 
 ## Installation
 
@@ -51,13 +56,26 @@ A Home Assistant integration to track and visualize countries visited by family 
 
 The JavaScript file is loaded automatically via the integration's frontend configuration.
 
+### Visual Editor
+
+The card includes a visual editor in Home Assistant's card editor UI:
+- **Entity Selection** - Choose from available sensor or person entities
+- **Color Pickers** - Visual color selection for all color options
+- **Title Configuration** - Set custom card title
+- **Ocean Color** - Configure ocean/water background color with transparent option
+
+### Manual Configuration
+
 Add the card to your dashboard:
 
 ```yaml
 type: custom:countries-map-card
 entity: sensor.countries_visited_person_your_name
 visited_color: '#4CAF50'
+current_color: '#FF5722'
 map_color: '#d0d0d0'
+ocean_color: '#e3f2fd'  # Optional, transparent by default
+title: 'My Travels'  # Optional
 ```
 
 **Note**: The card accepts either the sensor entity (`sensor.countries_visited_*`) or the person entity (`person.*`). If you provide a person entity, the card will automatically find the corresponding sensor entity.
@@ -71,6 +89,7 @@ map_color: '#d0d0d0'
 | `visited_color` | string | `#4CAF50` | Color for visited countries |
 | `current_color` | string | `#FF5722` | Color for current location |
 | `map_color` | string | `#d0d0d0` | Color for non-visited countries |
+| `ocean_color` | string | `transparent` | Background color for ocean/water areas (transparent by default) |
 | `title` | string | `Countries Visited` | Card title |
 
 ## Sensors
