@@ -9,6 +9,7 @@ PLATFORMS = ["sensor", "binary_sensor"]
 CONF_PERSON = "person"
 CONF_MAP_COLOR = "map_color"
 CONF_VISITED_COLOR = "visited_color"
+CONF_OCEAN_COLOR = "ocean_color"
 CONF_ACCESS_TOKEN = "access_token"
 
 # Default colors

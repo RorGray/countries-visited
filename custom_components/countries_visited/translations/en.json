@@ -7,7 +7,9 @@
         "data": {
           "person": "Person",
           "map_color": "Default Map Color",
-          "visited_color": "Visited Country Color"
+          "visited_color": "Visited Country Color",
+          "ocean_color": "Ocean Color",
+          "access_token": "Access Token"
         }
       }
     },
@@ -19,8 +21,52 @@
           "data": {
             "person": "Person",
             "map_color": "Default Map Color",
-            "visited_color": "Visited Country Color"
+            "visited_color": "Visited Country Color",
+            "ocean_color": "Ocean Color",
+            "access_token": "Access Token"
           }
+        }
+      }
+    }
+  },
+  "ui": {
+    "card": {
+      "countries_visited": {
+        "title": "Countries Visited",
+        "countries": "countries",
+        "legend": {
+          "visited": "Visited",
+          "current": "Current",
+          "not_visited": "Not visited"
+        },
+        "tooltip": {
+          "region": "Region",
+          "population": "Pop.",
+          "sovereignty": "Sovereignty",
+          "badge": {
+            "visited": "Visited",
+            "current": "Current"
+          },
+          "regions": {
+            "AF": "Africa",
+            "AS": "Asia",
+            "EU": "Europe",
+            "NA": "North America",
+            "SA": "South America",
+            "OC": "Oceania",
+            "AN": "Antarctica"
+          }
+        },
+        "controls": {
+          "zoom_in": "Zoom in",
+          "zoom_out": "Zoom out",
+          "reset_view": "Reset view"
+        },
+        "errors": {
+          "sensor_not_found": "Sensor not found",
+          "sensor_not_found_message": "Could not find sensor entity for person: {person}",
+          "sensor_not_found_help": "Please configure the Countries Visited integration for this person.",
+          "entity_not_found": "Entity {entity} not found. Make sure the Countries Visited integration is configured."
         }
       }
     }

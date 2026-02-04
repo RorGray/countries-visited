@@ -57,6 +57,7 @@ countries-map-card .map-container {
   border-radius: 12px;
   overflow: hidden;
   touch-action: none; /* Prevent default touch actions for custom gestures */
+  background: transparent; /* Default transparent, can be overridden by ocean_color */
 }
 
 countries-map-card .map-container svg {

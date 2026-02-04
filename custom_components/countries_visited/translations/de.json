@@ -1,0 +1,74 @@
+{
+  "config": {
+    "title": "Countries Visited",
+    "step": {
+      "user": {
+        "title": "Person auswählen",
+        "data": {
+          "person": "Person",
+          "map_color": "Standard-Kartenfarbe",
+          "visited_color": "Farbe für besuchte Länder",
+          "ocean_color": "Ozeanfarbe",
+          "access_token": "Zugriffstoken"
+        }
+      }
+    },
+    "options": {
+      "title": "Countries Visited Optionen",
+      "step": {
+        "init": {
+          "title": "Einstellungen",
+          "data": {
+            "person": "Person",
+            "map_color": "Standard-Kartenfarbe",
+            "visited_color": "Farbe für besuchte Länder",
+            "ocean_color": "Ozeanfarbe",
+            "access_token": "Zugriffstoken"
+          }
+        }
+      }
+    }
+  },
+  "ui": {
+    "card": {
+      "countries_visited": {
+        "title": "Countries Visited",
+        "countries": "Länder",
+        "legend": {
+          "visited": "Besucht",
+          "current": "Aktuell",
+          "not_visited": "Nicht besucht"
+        },
+        "tooltip": {
+          "region": "Region",
+          "population": "Bev.",
+          "sovereignty": "Souveränität",
+          "badge": {
+            "visited": "Besucht",
+            "current": "Aktuell"
+          },
+          "regions": {
+            "AF": "Afrika",
+            "AS": "Asien",
+            "EU": "Europa",
+            "NA": "Nordamerika",
+            "SA": "Südamerika",
+            "OC": "Ozeanien",
+            "AN": "Antarktis"
+          }
+        },
+        "controls": {
+          "zoom_in": "Vergrößern",
+          "zoom_out": "Verkleinern",
+          "reset_view": "Ansicht zurücksetzen"
+        },
+        "errors": {
+          "sensor_not_found": "Sensor nicht gefunden",
+          "sensor_not_found_message": "Sensor-Entität für Person nicht gefunden: {person}",
+          "sensor_not_found_help": "Bitte konfigurieren Sie die Countries Visited Integration für diese Person.",
+          "entity_not_found": "Entität {entity} nicht gefunden. Stellen Sie sicher, dass die Countries Visited Integration konfiguriert ist."
+        }
+      }
+    }
+  }
+}

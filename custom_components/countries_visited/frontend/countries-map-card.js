@@ -140,7 +140,7 @@ class CountriesMapCard extends HTMLElement {
     // Pan and zoom state
     this._zoom = 2.5;
     this._minZoom = 1;
-    this._maxZoom = 8;
+    this._maxZoom = 15;
     this._panX = 0;
     this._panY = 0;
     this._isPanning = false;
@@ -383,15 +383,20 @@ class CountriesMapCard extends HTMLElement {
         const existingStyleTag = this.querySelector('style');
         const styleTagContent = existingStyleTag ? existingStyleTag.outerHTML : '';
 
+        const errorTitle = this._translate('errors.sensor_not_found', 'Sensor not found');
+        const errorMessage = this._translate('errors.sensor_not_found_message', `Could not find sensor entity for person: ${personEntity}`).replace('{person}', personEntity);
+        const errorHelp = this._translate('errors.sensor_not_found_help', 'Please configure the Countries Visited integration for this person.');
+        const cardTitle = this._translate('title', 'Countries Visited');
+        
         this.innerHTML = styleTagContent + `
           <div class="countries-card">
             <div class="card-header">
-              <div class="card-title">Countries Visited</div>
+              <div class="card-title">${cardTitle}</div>
             </div>
             <div style="padding: 20px; text-align: center; color: #888;">
-              <p><strong>Sensor not found</strong></p>
-              <p>Could not find sensor entity for person: <code>${personEntity}</code></p>
-              <p style="font-size: 0.9em; margin-top: 10px;">Please configure the Countries Visited integration for this person.</p>
+              <p><strong>${errorTitle}</strong></p>
+              <p>${errorMessage}</p>
+              <p style="font-size: 0.9em; margin-top: 10px;">${errorHelp}</p>
             </div>
           </div>
         `;
@@ -402,13 +407,20 @@ class CountriesMapCard extends HTMLElement {
     const visitedColor = this._config.visited_color || '#4CAF50';
     const mapColor = this._config.map_color || '#d0d0d0';
     const currentColor = this._config.current_color || '#FF5722';
-    const title = this._config.title || 'Countries Visited';
+    const oceanColor = this._config.ocean_color || '';
+    
+    const title = this._config.title || this._translate('title', 'Countries Visited');
+    const countriesText = this._translate('countries', 'countries');
+    
+    // Build ocean color style (transparent if not set)
+    const oceanColorStyle = oceanColor ? `background: ${oceanColor};` : '';
 
     const stateObj = this._hass.states[entity];
 
     // If entity doesn't exist, throw error for Home Assistant to display
     if (!stateObj) {
-      throw new Error(`Entity ${entity} not found. Make sure the Countries Visited integration is configured.`);
+      const errorMsg = this._translate('errors.entity_not_found', `Entity ${entity} not found. Make sure the Countries Visited integration is configured.`).replace('{entity}', entity);
+      throw new Error(errorMsg);
     }
 
     const visitedCountries = stateObj?.attributes?.visited_countries || [];
@@ -443,15 +455,15 @@ class CountriesMapCard extends HTMLElement {
               ${currentCountry || ''}
             </span>
           </div>
-          <div class="card-stats" style="background: ${visitedColor}15;"><strong style="color: ${visitedColor};">${visitedCountries.length}</strong> countries</div>
+          <div class="card-stats" style="background: ${visitedColor}15;"><strong style="color: ${visitedColor};">${visitedCountries.length}</strong> ${countriesText}</div>
         </div>
         
-        <div class="map-container" id="map-container">
+        <div class="map-container" id="map-container" style="${oceanColorStyle}">
           ${this.getWorldMapSVG(countries, visitedCountries, currentCountry, mapColor, visitedColor, currentColor)}
           <div class="map-controls">
-            <button class="map-control-btn zoom-in" title="Zoom in">+</button>
-            <button class="map-control-btn zoom-out" title="Zoom out">−</button>
-            <button class="map-control-btn reset zoom-reset" title="Reset view">
+            <button class="map-control-btn zoom-in" title="${this._translate('controls.zoom_in', 'Zoom in')}">+</button>
+            <button class="map-control-btn zoom-out" title="${this._translate('controls.zoom_out', 'Zoom out')}">−</button>
+            <button class="map-control-btn reset zoom-reset" title="${this._translate('controls.reset_view', 'Reset view')}">
               <ha-icon icon="mdi:fit-to-screen"></ha-icon>
             </button>
           </div>
@@ -468,9 +480,9 @@ class CountriesMapCard extends HTMLElement {
         ` : ''}
         
         <div class="legend">
-          <div class="legend-item"><div class="legend-color visited" style="background: ${visitedColor};"></div><span>Visited</span></div>
-          <div class="legend-item"><div class="legend-color current" style="background: ${currentColor};"></div><span>Current</span></div>
-          <div class="legend-item"><div class="legend-color default" style="background: ${mapColor};"></div><span>Not visited</span></div>
+          <div class="legend-item"><div class="legend-color visited" style="background: ${visitedColor};"></div><span>${this._translate('legend.visited', 'Visited')}</span></div>
+          <div class="legend-item"><div class="legend-color current" style="background: ${currentColor};"></div><span>${this._translate('legend.current', 'Current')}</span></div>
+          <div class="legend-item"><div class="legend-color default" style="background: ${mapColor};"></div><span>${this._translate('legend.not_visited', 'Not visited')}</span></div>
         </div>
       </div>
     `;
@@ -496,6 +508,32 @@ class CountriesMapCard extends HTMLElement {
     const g = Math.max(0, Math.min(255, parseInt(hex.substr(2, 2), 16) + amount));
     const b = Math.max(0, Math.min(255, parseInt(hex.substr(4, 2), 16) + amount));
     return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+  }
+
+  _translate(key, fallback) {
+    if (!this._hass || !this._hass.localize) {
+      return fallback;
+    }
+    
+    // Try multiple translation key formats
+    const keys = [
+      `component.countries_visited.ui.card.countries_visited.${key}`,
+      `ui.card.countries_visited.${key}`,
+      `config.flow.countries_visited.ui.card.countries_visited.${key}`
+    ];
+    
+    for (const translationKey of keys) {
+      try {
+        const translation = this._hass.localize(translationKey);
+        if (translation && translation !== translationKey) {
+          return translation;
+        }
+      } catch (e) {
+        // Continue to next key format
+      }
+    }
+    
+    return fallback;
   }
 
   // ==================== Pan & Zoom Methods ====================
@@ -912,9 +950,9 @@ class CountriesMapCard extends HTMLElement {
         
         // Title with status badge (inline, more compact)
         const statusBadge = isCurrent 
-          ? `<span class="tooltip-badge current" style="background: ${currentColor}20; color: ${currentColor};">Current</span>`
+          ? `<span class="tooltip-badge current" style="background: ${currentColor}20; color: ${currentColor};">${this._translate('tooltip.badge.current', 'Current')}</span>`
           : isVisited 
-          ? `<span class="tooltip-badge visited" style="background: ${visitedColor}20; color: ${visitedColor};">Visited</span>`
+          ? `<span class="tooltip-badge visited" style="background: ${visitedColor}20; color: ${visitedColor};">${this._translate('tooltip.badge.visited', 'Visited')}</span>`
           : '';
         
         tooltipHTML += `<div class="tooltip-title">${name}${statusBadge ? ' ' + statusBadge : ''}</div>`;
@@ -923,25 +961,28 @@ class CountriesMapCard extends HTMLElement {
         const infoLines = [];
         
         if (info.region) {
-          const regionNames = {
-            'AF': 'Africa',
-            'AS': 'Asia',
-            'EU': 'Europe',
-            'NA': 'North America',
-            'SA': 'South America',
-            'OC': 'Oceania',
-            'AN': 'Antarctica'
-          };
-          infoLines.push(`<span class="tooltip-info-item"><span class="tooltip-label">Region:</span> ${regionNames[info.region] || info.region}</span>`);
+          const regionName = this._translate(`tooltip.regions.${info.region}`, 
+            info.region === 'AF' ? 'Africa' :
+            info.region === 'AS' ? 'Asia' :
+            info.region === 'EU' ? 'Europe' :
+            info.region === 'NA' ? 'North America' :
+            info.region === 'SA' ? 'South America' :
+            info.region === 'OC' ? 'Oceania' :
+            info.region === 'AN' ? 'Antarctica' : info.region
+          );
+          const regionLabel = this._translate('tooltip.region', 'Region');
+          infoLines.push(`<span class="tooltip-info-item"><span class="tooltip-label">${regionLabel}:</span> ${regionName}</span>`);
         }
         
         if (info.population !== undefined && info.population > 0) {
           const formattedPop = this._formatPopulation(info.population);
-          infoLines.push(`<span class="tooltip-info-item"><span class="tooltip-label">Pop:</span> ${formattedPop}</span>`);
+          const popLabel = this._translate('tooltip.population', 'Pop.');
+          infoLines.push(`<span class="tooltip-info-item"><span class="tooltip-label">${popLabel}</span> ${formattedPop}</span>`);
         }
         
         if (info.sovereignty && info.sovereignty !== 'UN' && info.sovereignty !== 'disputed') {
-          infoLines.push(`<span class="tooltip-info-item"><span class="tooltip-label">Sovereignty:</span> ${info.sovereignty}</span>`);
+          const sovereigntyLabel = this._translate('tooltip.sovereignty', 'Sovereignty');
+          infoLines.push(`<span class="tooltip-info-item"><span class="tooltip-label">${sovereigntyLabel}:</span> ${info.sovereignty}</span>`);
         }
         
         // Only show additional info section if we have info
