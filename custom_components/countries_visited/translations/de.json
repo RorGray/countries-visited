@@ -6,7 +6,7 @@
         "title": "Person auswählen",
         "data": {
           "person": "Person",
-          "map_color": "Standard-Kartenfarbe",
+          "map_color": "Länderfarbe (Standard)",
           "visited_color": "Farbe für besuchte Länder",
           "ocean_color": "Ozeanfarbe",
           "access_token": "Zugriffstoken"
@@ -20,7 +20,7 @@
           "title": "Einstellungen",
           "data": {
             "person": "Person",
-            "map_color": "Standard-Kartenfarbe",
+            "map_color": "Länderfarbe (Standard)",
             "visited_color": "Farbe für besuchte Länder",
             "ocean_color": "Ozeanfarbe",
             "access_token": "Zugriffstoken"

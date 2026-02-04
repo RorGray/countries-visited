@@ -6,9 +6,9 @@
         "title": "Select Person",
         "data": {
           "person": "Person",
-          "map_color": "Default Map Color",
-          "visited_color": "Visited Country Color",
-          "ocean_color": "Ocean Color",
+          "map_color": "Country Colour (default)",
+          "visited_color": "Visited Country Colour",
+          "ocean_color": "Ocean Colour",
           "access_token": "Access Token"
         }
       }
@@ -20,9 +20,9 @@
           "title": "Settings",
           "data": {
             "person": "Person",
-            "map_color": "Default Map Color",
-            "visited_color": "Visited Country Color",
-            "ocean_color": "Ocean Color",
+            "map_color": "Country Colour (default)",
+            "visited_color": "Visited Country Colour",
+            "ocean_color": "Ocean Colour",
             "access_token": "Access Token"
           }
         }

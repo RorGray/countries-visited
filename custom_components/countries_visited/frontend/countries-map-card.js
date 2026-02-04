@@ -1,5 +1,6 @@
 // Card version
 const CARD_VERSION = '0.2';
+const DOMAIN = 'countries_visited';
 
 // Dynamic import for map-data.js with version tag
 async function loadMapDataModule() {
@@ -201,6 +202,21 @@ class CountriesMapCard extends HTMLElement {
 
   getConfig() {
     return this._config;
+  }
+
+  static getConfigElement() {
+    return document.createElement('countries-map-card-editor');
+  }
+
+  static getStubConfig() {
+    return {
+      entity: '',
+      title: '',
+      visited_color: '#4CAF50',
+      current_color: '#FF5722',
+      map_color: '#d0d0d0',
+      ocean_color: ''
+    };
   }
 
   _shouldUpdate() {
@@ -515,16 +531,19 @@ class CountriesMapCard extends HTMLElement {
       return fallback;
     }
     
-    // Try multiple translation key formats
+    // Try multiple translation key formats for frontend translations
+    // Home Assistant loads custom integration translations with the component prefix
     const keys = [
-      `component.countries_visited.ui.card.countries_visited.${key}`,
+      `component.${DOMAIN}.ui.card.countries_visited.${key}`,
       `ui.card.countries_visited.${key}`,
+      `component.countries_visited.ui.card.countries_visited.${key}`,
       `config.flow.countries_visited.ui.card.countries_visited.${key}`
     ];
     
     for (const translationKey of keys) {
       try {
         const translation = this._hass.localize(translationKey);
+        // Check if we got a valid translation (not the key itself)
         if (translation && translation !== translationKey) {
           return translation;
         }
@@ -1180,7 +1199,7 @@ class CountriesMapCardEditor extends HTMLElement {
 
         <div style="margin-bottom: 16px;">
           <label style="display: block; margin-bottom: 8px; font-weight: bold;">
-            Map Color (default)
+            Country Color (default)
           </label>
           <input 
             type="color" 
@@ -1262,11 +1281,6 @@ class CountriesMapCardEditor extends HTMLElement {
 
 // Register the editor
 customElements.define('countries-map-card-editor', CountriesMapCardEditor);
-
-// Add getConfigElement method to the card class
-CountriesMapCard.prototype.getConfigElement = function() {
-  return document.createElement('countries-map-card-editor');
-};
 
 // Register card with Home Assistant's card registry
 if (window.customCards) {
