@@ -1,5 +1,5 @@
 // Card version
-const CARD_VERSION = '0.1';
+const CARD_VERSION = '0.2';
 
 // Dynamic import for map-data.js with version tag
 async function loadMapDataModule() {
@@ -130,6 +130,32 @@ class CountriesMapCard extends HTMLElement {
     this._lastConfig = null;
     // Track if style tag has been added to this card instance
     this._styleTagAdded = false;
+    
+    // Pan and zoom state
+    this._zoom = 2.5;
+    this._minZoom = 1;
+    this._maxZoom = 8;
+    this._panX = 0;
+    this._panY = 0;
+    this._isPanning = false;
+    this._startPanX = 0;
+    this._startPanY = 0;
+    this._startMouseX = 0;
+    this._startMouseY = 0;
+    
+    // Original viewBox dimensions
+    this._viewBoxWidth = 1000;
+    this._viewBoxHeight = 666;
+    
+    // Touch gesture state
+    this._lastTouchDistance = 0;
+    this._touchStartZoom = 2.5;
+    
+    // Zoom indicator timeout
+    this._zoomIndicatorTimeout = null;
+    
+    // Track if we've done initial centering (to avoid re-centering on re-renders)
+    this._initialCenterDone = false;
   }
 
   set hass(hass) {
@@ -398,6 +424,14 @@ class CountriesMapCard extends HTMLElement {
         
         <div class="map-container" id="map-container">
           ${this.getWorldMapSVG(countries, visitedCountries, currentCountry, mapColor, visitedColor, currentColor)}
+          <div class="map-controls">
+            <button class="map-control-btn zoom-in" title="Zoom in">+</button>
+            <button class="map-control-btn zoom-out" title="Zoom out">−</button>
+            <button class="map-control-btn reset zoom-reset" title="Reset view">
+              <ha-icon icon="mdi:fit-to-screen"></ha-icon>
+            </button>
+          </div>
+          <div class="zoom-indicator">100%</div>
           <div class="tooltip" id="tooltip"></div>
         </div>
         
@@ -418,6 +452,8 @@ class CountriesMapCard extends HTMLElement {
     `;
 
     this._setupTooltips();
+    this._setupPanZoom();
+    this._setupZoomControls();
 
     // Update last state after rendering to track what was rendered
     if (stateObj) {
@@ -436,6 +472,304 @@ class CountriesMapCard extends HTMLElement {
     const g = Math.max(0, Math.min(255, parseInt(hex.substr(2, 2), 16) + amount));
     const b = Math.max(0, Math.min(255, parseInt(hex.substr(4, 2), 16) + amount));
     return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+  }
+
+  // ==================== Pan & Zoom Methods ====================
+
+  _setupPanZoom() {
+    const container = this.querySelector('#map-container');
+    const svg = container?.querySelector('svg');
+    if (!container || !svg) return;
+
+    // Store reference for event handlers
+    this._mapContainer = container;
+    this._mapSvg = svg;
+
+    // Mouse wheel zoom
+    container.addEventListener('wheel', this._handleWheel.bind(this), { passive: false });
+
+    // Mouse drag pan
+    svg.addEventListener('mousedown', this._handleMouseDown.bind(this));
+    document.addEventListener('mousemove', this._handleMouseMove.bind(this));
+    document.addEventListener('mouseup', this._handleMouseUp.bind(this));
+
+    // Touch gestures
+    container.addEventListener('touchstart', this._handleTouchStart.bind(this), { passive: false });
+    container.addEventListener('touchmove', this._handleTouchMove.bind(this), { passive: false });
+    container.addEventListener('touchend', this._handleTouchEnd.bind(this));
+
+    // Double-click to zoom in
+    container.addEventListener('dblclick', this._handleDoubleClick.bind(this));
+
+    // Center on current country if available, otherwise show full map
+    const currentCountryEl = svg.querySelector('.country.current');
+    if (currentCountryEl && !this._initialCenterDone) {
+      this._centerOnCountry(currentCountryEl);
+      this._initialCenterDone = true;
+    } else if (!this._initialCenterDone) {
+      // No current country - show full map at zoom 1
+      this._zoom = 1;
+      this._panX = 0;
+      this._panY = 0;
+      this._initialCenterDone = true;
+    }
+
+    // Apply initial viewBox
+    this._updateViewBox();
+  }
+
+  _centerOnCountry(countryElement) {
+    // Get the bounding box of the country path in SVG coordinates
+    const bbox = countryElement.getBBox();
+    
+    // Calculate center of the country
+    const countryCenterX = bbox.x + bbox.width / 2;
+    const countryCenterY = bbox.y + bbox.height / 2;
+
+    // Calculate visible area at current zoom
+    const visibleWidth = this._viewBoxWidth / this._zoom;
+    const visibleHeight = this._viewBoxHeight / this._zoom;
+
+    // Calculate pan to center the country
+    this._panX = countryCenterX - visibleWidth / 2;
+    this._panY = countryCenterY - visibleHeight / 2;
+
+    // Constrain to bounds
+    this._constrainPan();
+  }
+
+  _handleWheel(e) {
+    e.preventDefault();
+    
+    const container = this._mapContainer;
+    const svg = this._mapSvg;
+    if (!container || !svg) return;
+
+    const rect = container.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    // Calculate zoom factor
+    const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+    const newZoom = Math.max(this._minZoom, Math.min(this._maxZoom, this._zoom * zoomFactor));
+
+    // Zoom towards mouse position
+    this._zoomToPoint(mouseX, mouseY, newZoom, rect);
+    this._showZoomIndicator();
+  }
+
+  _handleMouseDown(e) {
+    if (e.button !== 0) return; // Only left mouse button
+    
+    this._isPanning = true;
+    this._startPanX = this._panX;
+    this._startPanY = this._panY;
+    this._startMouseX = e.clientX;
+    this._startMouseY = e.clientY;
+    
+    if (this._mapSvg) {
+      this._mapSvg.classList.add('grabbing');
+    }
+  }
+
+  _handleMouseMove(e) {
+    if (!this._isPanning) return;
+    
+    const container = this._mapContainer;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    const dx = (e.clientX - this._startMouseX) / rect.width * this._viewBoxWidth / this._zoom;
+    const dy = (e.clientY - this._startMouseY) / rect.height * this._viewBoxHeight / this._zoom;
+
+    this._panX = this._startPanX - dx;
+    this._panY = this._startPanY - dy;
+
+    this._constrainPan();
+    this._updateViewBox();
+  }
+
+  _handleMouseUp() {
+    this._isPanning = false;
+    if (this._mapSvg) {
+      this._mapSvg.classList.remove('grabbing');
+    }
+  }
+
+  _handleTouchStart(e) {
+    if (e.touches.length === 2) {
+      // Pinch zoom start
+      e.preventDefault();
+      this._lastTouchDistance = this._getTouchDistance(e.touches);
+      this._touchStartZoom = this._zoom;
+    } else if (e.touches.length === 1) {
+      // Single touch pan start
+      this._isPanning = true;
+      this._startPanX = this._panX;
+      this._startPanY = this._panY;
+      this._startMouseX = e.touches[0].clientX;
+      this._startMouseY = e.touches[0].clientY;
+    }
+  }
+
+  _handleTouchMove(e) {
+    const container = this._mapContainer;
+    if (!container) return;
+
+    if (e.touches.length === 2) {
+      // Pinch zoom
+      e.preventDefault();
+      const currentDistance = this._getTouchDistance(e.touches);
+      const scale = currentDistance / this._lastTouchDistance;
+      const newZoom = Math.max(this._minZoom, Math.min(this._maxZoom, this._touchStartZoom * scale));
+
+      // Zoom towards center of pinch
+      const rect = container.getBoundingClientRect();
+      const centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+      const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+
+      this._zoomToPoint(centerX, centerY, newZoom, rect);
+      this._showZoomIndicator();
+    } else if (e.touches.length === 1 && this._isPanning) {
+      // Single touch pan
+      e.preventDefault();
+      const rect = container.getBoundingClientRect();
+      const dx = (e.touches[0].clientX - this._startMouseX) / rect.width * this._viewBoxWidth / this._zoom;
+      const dy = (e.touches[0].clientY - this._startMouseY) / rect.height * this._viewBoxHeight / this._zoom;
+
+      this._panX = this._startPanX - dx;
+      this._panY = this._startPanY - dy;
+
+      this._constrainPan();
+      this._updateViewBox();
+    }
+  }
+
+  _handleTouchEnd(e) {
+    if (e.touches.length < 2) {
+      this._lastTouchDistance = 0;
+    }
+    if (e.touches.length === 0) {
+      this._isPanning = false;
+    }
+  }
+
+  _handleDoubleClick(e) {
+    const container = this._mapContainer;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    // Zoom in by 2x on double-click, or reset if already at max zoom
+    const newZoom = this._zoom >= this._maxZoom * 0.9 ? 1 : Math.min(this._maxZoom, this._zoom * 2);
+    
+    if (newZoom === 1) {
+      this._resetView();
+    } else {
+      this._zoomToPoint(mouseX, mouseY, newZoom, rect);
+    }
+    this._showZoomIndicator();
+  }
+
+  _getTouchDistance(touches) {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  _zoomToPoint(pointX, pointY, newZoom, containerRect) {
+    // Convert screen point to viewBox coordinates before zoom
+    const viewBoxX = this._panX + (pointX / containerRect.width) * (this._viewBoxWidth / this._zoom);
+    const viewBoxY = this._panY + (pointY / containerRect.height) * (this._viewBoxHeight / this._zoom);
+
+    // Update zoom
+    this._zoom = newZoom;
+
+    // Adjust pan to keep the point under cursor
+    this._panX = viewBoxX - (pointX / containerRect.width) * (this._viewBoxWidth / this._zoom);
+    this._panY = viewBoxY - (pointY / containerRect.height) * (this._viewBoxHeight / this._zoom);
+
+    this._constrainPan();
+    this._updateViewBox();
+  }
+
+  _constrainPan() {
+    // Calculate visible area dimensions
+    const visibleWidth = this._viewBoxWidth / this._zoom;
+    const visibleHeight = this._viewBoxHeight / this._zoom;
+
+    // Constrain pan to keep the map within bounds
+    const maxPanX = this._viewBoxWidth - visibleWidth;
+    const maxPanY = this._viewBoxHeight - visibleHeight;
+
+    this._panX = Math.max(0, Math.min(maxPanX, this._panX));
+    this._panY = Math.max(0, Math.min(maxPanY, this._panY));
+  }
+
+  _updateViewBox() {
+    const svg = this._mapSvg;
+    if (!svg) return;
+
+    const visibleWidth = this._viewBoxWidth / this._zoom;
+    const visibleHeight = this._viewBoxHeight / this._zoom;
+
+    svg.setAttribute('viewBox', `${this._panX} ${this._panY} ${visibleWidth} ${visibleHeight}`);
+  }
+
+  _showZoomIndicator() {
+    const indicator = this.querySelector('.zoom-indicator');
+    if (!indicator) return;
+
+    indicator.textContent = `${Math.round(this._zoom * 100)}%`;
+    indicator.classList.add('visible');
+
+    // Hide after 1.5 seconds
+    clearTimeout(this._zoomIndicatorTimeout);
+    this._zoomIndicatorTimeout = setTimeout(() => {
+      indicator.classList.remove('visible');
+    }, 1500);
+  }
+
+  _zoomIn() {
+    const newZoom = Math.min(this._maxZoom, this._zoom * 1.5);
+    const container = this._mapContainer;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    // Zoom towards center
+    this._zoomToPoint(rect.width / 2, rect.height / 2, newZoom, rect);
+    this._showZoomIndicator();
+  }
+
+  _zoomOut() {
+    const newZoom = Math.max(this._minZoom, this._zoom / 1.5);
+    const container = this._mapContainer;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    // Zoom towards center
+    this._zoomToPoint(rect.width / 2, rect.height / 2, newZoom, rect);
+    this._showZoomIndicator();
+  }
+
+  _resetView() {
+    this._zoom = 1;
+    this._panX = 0;
+    this._panY = 0;
+    this._updateViewBox();
+    this._showZoomIndicator();
+  }
+
+  _setupZoomControls() {
+    const zoomIn = this.querySelector('.zoom-in');
+    const zoomOut = this.querySelector('.zoom-out');
+    const reset = this.querySelector('.zoom-reset');
+
+    if (zoomIn) zoomIn.addEventListener('click', () => this._zoomIn());
+    if (zoomOut) zoomOut.addEventListener('click', () => this._zoomOut());
+    if (reset) reset.addEventListener('click', () => this._resetView());
   }
 
   _setupTooltips() {

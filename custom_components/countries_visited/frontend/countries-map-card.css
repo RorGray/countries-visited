@@ -57,12 +57,85 @@ countries-map-card .map-container {
   background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
   border-radius: 12px;
   overflow: hidden;
+  touch-action: none; /* Prevent default touch actions for custom gestures */
 }
 
 countries-map-card .map-container svg {
   width: 100%;
   height: auto;
   display: block;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+countries-map-card .map-container svg.grabbing {
+  cursor: grabbing;
+}
+
+/* Map zoom controls */
+countries-map-card .map-controls {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 10;
+}
+
+countries-map-card .map-control-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  background: var(--card-background-color, #fff);
+  color: var(--primary-text-color, #1a1a1a);
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+
+countries-map-card .map-control-btn:hover {
+  background: var(--secondary-background-color, #f5f5f5);
+}
+
+countries-map-card .map-control-btn:active {
+  transform: scale(0.95);
+}
+
+countries-map-card .map-control-btn.reset {
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+countries-map-card .map-control-btn ha-icon {
+  --mdc-icon-size: 18px;
+}
+
+/* Zoom level indicator */
+countries-map-card .zoom-indicator {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  padding: 4px 8px;
+  background: var(--card-background-color, #fff);
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--secondary-text-color, #666);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 10;
+}
+
+countries-map-card .zoom-indicator.visible {
+  opacity: 1;
 }
 
 countries-map-card .country {

@@ -2,7 +2,7 @@
   "domain": "countries_visited",
   "name": "Countries Visited",
   "documentation": "https://github.com/RorGray/countries-visited",
-  "version": "v0.1",
+  "version": "v0.2",
   "requirements": ["geopy>=2.3.0"],
   "codeowners": ["@suxarik", "@RorGray"],
   "config_flow": true,
