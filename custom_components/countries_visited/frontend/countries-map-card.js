@@ -219,6 +219,10 @@ class CountriesMapCard extends HTMLElement {
     };
   }
 
+  getCardSize() {
+    return 8; // Default card size (can be overridden in layout)
+  }
+
   _shouldUpdate() {
     if (!this._config || !this._hass) return false;
 
@@ -1114,6 +1118,11 @@ class CountriesMapCardEditor extends HTMLElement {
     if (this.parentElement) {
       this._buildEditor();
     }
+    // Update entity picker if it exists
+    const entityPicker = this.querySelector('ha-entity-picker');
+    if (entityPicker) {
+      entityPicker.hass = hass;
+    }
   }
 
   _buildEditor() {
@@ -1154,17 +1163,33 @@ class CountriesMapCardEditor extends HTMLElement {
     const entityGroup = document.createElement('div');
     entityGroup.className = 'form-group';
     const entityPicker = document.createElement('ha-entity-picker');
+    
+    // Set properties
     entityPicker.hass = this._hass;
     entityPicker.value = currentEntity;
     entityPicker.label = 'Entity';
     entityPicker.includeDomains = ['sensor', 'person'];
     entityPicker.entityFilter = entityFilter;
+    
     entityPicker.addEventListener('value-changed', (ev) => {
       this._config.entity = ev.detail.value || '';
       this._fireConfigChanged();
     });
+    
     entityGroup.appendChild(entityPicker);
     container.appendChild(entityGroup);
+    
+    // Ensure entity picker is properly initialized after being added to DOM
+    // Use requestAnimationFrame to ensure DOM is ready
+    requestAnimationFrame(() => {
+      if (entityPicker && entityPicker.hass !== this._hass) {
+        entityPicker.hass = this._hass;
+      }
+      // Force update if it's a Lit element
+      if (entityPicker.requestUpdate) {
+        entityPicker.requestUpdate();
+      }
+    });
 
     // Title field
     const titleGroup = document.createElement('div');
