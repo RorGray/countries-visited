@@ -46,6 +46,12 @@ function logError(message, ...args) {
   console.error(`%c🌍 Countries Visited ${message}`, logStyle.error, ...args);
 }
 
+function logDebug(message, ...args) {
+  if (console.debug) {
+    console.debug(`%c🌍 Countries Visited ${message}`, logStyle.debug, ...args);
+  }
+}
+
 function logVersion() {
   console.log(`%c🌍 Countries Visited Card v${CARD_VERSION}`, logStyle.version);
 }
@@ -156,6 +162,14 @@ class CountriesMapCard extends HTMLElement {
     
     // Track if we've done initial centering (to avoid re-centering on re-renders)
     this._initialCenterDone = false;
+    
+    // Country info for tooltips
+    this._countryInfo = {};
+    
+    // Bound event handlers (to allow proper removal)
+    this._boundHandleMouseMove = this._handleMouseMove.bind(this);
+    this._boundHandleMouseUp = this._handleMouseUp.bind(this);
+    this._documentListenersAdded = false;
   }
 
   set hass(hass) {
@@ -403,11 +417,21 @@ class CountriesMapCard extends HTMLElement {
     // Load countries data (with version tag)
     const mapDataModule = await loadMapDataModule();
     const countries = await mapDataModule.loadCountriesData();
+    
+    // Store country info for tooltip lookups
+    this._countryInfo = countries._countryInfo || {};
+    
+    // Debug: Log if country info was loaded
+    if (Object.keys(this._countryInfo).length > 0) {
+      logDebug(`Loaded country info for ${Object.keys(this._countryInfo).length} countries`);
+    } else {
+      logWarn('No country info loaded - tooltips will show limited information');
+    }
 
     // Preserve the style tag when setting innerHTML
     const existingStyleTag = this.querySelector('style');
     const styleTagContent = existingStyleTag ? existingStyleTag.outerHTML : '';
-
+    
     this.innerHTML = styleTagContent + `
       <div class="countries-card">
         <div class="card-header">
@@ -485,21 +509,40 @@ class CountriesMapCard extends HTMLElement {
     this._mapContainer = container;
     this._mapSvg = svg;
 
-    // Mouse wheel zoom
-    container.addEventListener('wheel', this._handleWheel.bind(this), { passive: false });
+    // Mouse wheel zoom (use bound handler stored on element to allow removal)
+    if (!container._wheelHandler) {
+      container._wheelHandler = this._handleWheel.bind(this);
+      container.addEventListener('wheel', container._wheelHandler, { passive: false });
+    }
 
-    // Mouse drag pan
-    svg.addEventListener('mousedown', this._handleMouseDown.bind(this));
-    document.addEventListener('mousemove', this._handleMouseMove.bind(this));
-    document.addEventListener('mouseup', this._handleMouseUp.bind(this));
+    // Mouse drag pan (use bound handler stored on element)
+    if (!svg._mousedownHandler) {
+      svg._mousedownHandler = this._handleMouseDown.bind(this);
+      svg.addEventListener('mousedown', svg._mousedownHandler);
+    }
+    
+    // Document-level listeners (only add once per card instance)
+    if (!this._documentListenersAdded) {
+      document.addEventListener('mousemove', this._boundHandleMouseMove);
+      document.addEventListener('mouseup', this._boundHandleMouseUp);
+      this._documentListenersAdded = true;
+    }
 
-    // Touch gestures
-    container.addEventListener('touchstart', this._handleTouchStart.bind(this), { passive: false });
-    container.addEventListener('touchmove', this._handleTouchMove.bind(this), { passive: false });
-    container.addEventListener('touchend', this._handleTouchEnd.bind(this));
+    // Touch gestures (use bound handlers stored on element)
+    if (!container._touchstartHandler) {
+      container._touchstartHandler = this._handleTouchStart.bind(this);
+      container._touchmoveHandler = this._handleTouchMove.bind(this);
+      container._touchendHandler = this._handleTouchEnd.bind(this);
+      container.addEventListener('touchstart', container._touchstartHandler, { passive: false });
+      container.addEventListener('touchmove', container._touchmoveHandler, { passive: false });
+      container.addEventListener('touchend', container._touchendHandler);
+    }
 
     // Double-click to zoom in
-    container.addEventListener('dblclick', this._handleDoubleClick.bind(this));
+    if (!container._dblclickHandler) {
+      container._dblclickHandler = this._handleDoubleClick.bind(this);
+      container.addEventListener('dblclick', container._dblclickHandler);
+    }
 
     // Center on current country if available, otherwise show full map
     const currentCountryEl = svg.querySelector('.country.current');
@@ -560,6 +603,11 @@ class CountriesMapCard extends HTMLElement {
 
   _handleMouseDown(e) {
     if (e.button !== 0) return; // Only left mouse button
+    
+    // Ignore clicks on control buttons
+    if (e.target.closest('.map-controls')) {
+      return;
+    }
     
     this._isPanning = true;
     this._startPanX = this._panX;
@@ -655,6 +703,11 @@ class CountriesMapCard extends HTMLElement {
   }
 
   _handleDoubleClick(e) {
+    // Ignore double-clicks on control buttons
+    if (e.target.closest('.map-controls')) {
+      return;
+    }
+    
     const container = this._mapContainer;
     if (!container) return;
 
@@ -733,25 +786,62 @@ class CountriesMapCard extends HTMLElement {
   }
 
   _zoomIn() {
-    const newZoom = Math.min(this._maxZoom, this._zoom * 1.5);
-    const container = this._mapContainer;
-    if (!container) return;
-
-    const rect = container.getBoundingClientRect();
-    // Zoom towards center
-    this._zoomToPoint(rect.width / 2, rect.height / 2, newZoom, rect);
+    // Zoom factor of 1.4 gives ~6 clicks from min to max zoom
+    const zoomFactor = 1.4;
+    
+    // If already at max zoom, don't do anything
+    if (this._zoom >= this._maxZoom) {
+      return;
+    }
+    
+    const newZoom = Math.min(this._maxZoom, this._zoom * zoomFactor);
+    
+    // Round to avoid floating point precision issues
+    this._zoomAroundCenter(Math.round(newZoom * 100) / 100);
     this._showZoomIndicator();
   }
 
   _zoomOut() {
-    const newZoom = Math.max(this._minZoom, this._zoom / 1.5);
-    const container = this._mapContainer;
-    if (!container) return;
-
-    const rect = container.getBoundingClientRect();
-    // Zoom towards center
-    this._zoomToPoint(rect.width / 2, rect.height / 2, newZoom, rect);
+    // Zoom factor of 1.4 gives ~6 clicks from max to min zoom
+    const zoomFactor = 1.4;
+    
+    // If already at min zoom, don't do anything
+    if (this._zoom <= this._minZoom) {
+      return;
+    }
+    
+    const newZoom = Math.max(this._minZoom, this._zoom / zoomFactor);
+    
+    // Round to avoid floating point precision issues
+    this._zoomAroundCenter(Math.round(newZoom * 100) / 100);
     this._showZoomIndicator();
+  }
+
+  _zoomAroundCenter(newZoom) {
+    // Don't zoom if the zoom level hasn't actually changed
+    if (newZoom === this._zoom) {
+      return;
+    }
+    
+    // Calculate the current center point in viewBox coordinates
+    const visibleWidth = this._viewBoxWidth / this._zoom;
+    const visibleHeight = this._viewBoxHeight / this._zoom;
+    const centerX = this._panX + visibleWidth / 2;
+    const centerY = this._panY + visibleHeight / 2;
+
+    // Update zoom
+    this._zoom = newZoom;
+
+    // Calculate new visible area dimensions
+    const newVisibleWidth = this._viewBoxWidth / this._zoom;
+    const newVisibleHeight = this._viewBoxHeight / this._zoom;
+
+    // Adjust pan to keep the same center point
+    this._panX = centerX - newVisibleWidth / 2;
+    this._panY = centerY - newVisibleHeight / 2;
+
+    this._constrainPan();
+    this._updateViewBox();
   }
 
   _resetView() {
@@ -767,9 +857,31 @@ class CountriesMapCard extends HTMLElement {
     const zoomOut = this.querySelector('.zoom-out');
     const reset = this.querySelector('.zoom-reset');
 
-    if (zoomIn) zoomIn.addEventListener('click', () => this._zoomIn());
-    if (zoomOut) zoomOut.addEventListener('click', () => this._zoomOut());
-    if (reset) reset.addEventListener('click', () => this._resetView());
+    // Only add handlers if not already added (check by stored handler reference)
+    if (zoomIn && !zoomIn._clickHandler) {
+      zoomIn._clickHandler = (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        this._zoomIn();
+      };
+      zoomIn.addEventListener('click', zoomIn._clickHandler);
+    }
+    if (zoomOut && !zoomOut._clickHandler) {
+      zoomOut._clickHandler = (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        this._zoomOut();
+      };
+      zoomOut.addEventListener('click', zoomOut._clickHandler);
+    }
+    if (reset && !reset._clickHandler) {
+      reset._clickHandler = (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        this._resetView();
+      };
+      reset.addEventListener('click', reset._clickHandler);
+    }
   }
 
   _setupTooltips() {
@@ -784,10 +896,60 @@ class CountriesMapCard extends HTMLElement {
       const originalFill = country.getAttribute('fill');
       const isCurrent = country.classList.contains('current');
       const isVisited = country.classList.contains('visited');
+      const countryCode = country.id;
 
       country.addEventListener('mouseenter', () => {
-        const name = country.getAttribute('title') || country.id;
-        tooltip.textContent = isCurrent ? `${name} (Current)` : isVisited ? `${name} (Visited)` : name;
+        // Get country info - try both uppercase and original case
+        let info = {};
+        if (this._countryInfo && Object.keys(this._countryInfo).length > 0) {
+          info = this._countryInfo[countryCode] || this._countryInfo[countryCode.toUpperCase()] || {};
+        }
+        
+        const name = country.getAttribute('title') || info.name || countryCode;
+        
+        // Build compact tooltip content
+        let tooltipHTML = '';
+        
+        // Title with status badge (inline, more compact)
+        const statusBadge = isCurrent 
+          ? `<span class="tooltip-badge current" style="background: ${currentColor}20; color: ${currentColor};">Current</span>`
+          : isVisited 
+          ? `<span class="tooltip-badge visited" style="background: ${visitedColor}20; color: ${visitedColor};">Visited</span>`
+          : '';
+        
+        tooltipHTML += `<div class="tooltip-title">${name}${statusBadge ? ' ' + statusBadge : ''}</div>`;
+        
+        // Build compact info lines (only show if we have info)
+        const infoLines = [];
+        
+        if (info.region) {
+          const regionNames = {
+            'AF': 'Africa',
+            'AS': 'Asia',
+            'EU': 'Europe',
+            'NA': 'North America',
+            'SA': 'South America',
+            'OC': 'Oceania',
+            'AN': 'Antarctica'
+          };
+          infoLines.push(`<span class="tooltip-info-item"><span class="tooltip-label">Region:</span> ${regionNames[info.region] || info.region}</span>`);
+        }
+        
+        if (info.population !== undefined && info.population > 0) {
+          const formattedPop = this._formatPopulation(info.population);
+          infoLines.push(`<span class="tooltip-info-item"><span class="tooltip-label">Pop:</span> ${formattedPop}</span>`);
+        }
+        
+        if (info.sovereignty && info.sovereignty !== 'UN' && info.sovereignty !== 'disputed') {
+          infoLines.push(`<span class="tooltip-info-item"><span class="tooltip-label">Sovereignty:</span> ${info.sovereignty}</span>`);
+        }
+        
+        // Only show additional info section if we have info
+        if (infoLines.length > 0) {
+          tooltipHTML += `<div class="tooltip-info">${infoLines.join('')}</div>`;
+        }
+        
+        tooltip.innerHTML = tooltipHTML;
         tooltip.classList.add('visible');
 
         // Darken color on hover
@@ -800,8 +962,29 @@ class CountriesMapCard extends HTMLElement {
 
       country.addEventListener('mousemove', (e) => {
         const rect = container.getBoundingClientRect();
-        tooltip.style.left = (e.clientX - rect.left) + 'px';
-        tooltip.style.top = (e.clientY - rect.top) + 'px';
+        const tooltipRect = tooltip.getBoundingClientRect();
+        
+        let left = e.clientX - rect.left;
+        let top = e.clientY - rect.top;
+        
+        // Adjust horizontal position to keep tooltip within container
+        const tooltipHalfWidth = tooltipRect.width / 2;
+        if (left + tooltipHalfWidth > rect.width) {
+          left = rect.width - tooltipHalfWidth - 10;
+        } else if (left - tooltipHalfWidth < 0) {
+          left = tooltipHalfWidth + 10;
+        }
+        
+        // Adjust vertical position to keep tooltip within container
+        const tooltipHeight = tooltipRect.height;
+        if (top - tooltipHeight < 0) {
+          top = tooltipHeight + 10;
+        } else if (top > rect.height) {
+          top = rect.height - 10;
+        }
+        
+        tooltip.style.left = left + 'px';
+        tooltip.style.top = top + 'px';
       });
 
       country.addEventListener('mouseleave', () => {
@@ -810,6 +993,17 @@ class CountriesMapCard extends HTMLElement {
         country.setAttribute('fill', originalFill);
       });
     });
+  }
+
+  _formatPopulation(population) {
+    if (population >= 1000000000) {
+      return (population / 1000000000).toFixed(2) + 'B';
+    } else if (population >= 1000000) {
+      return (population / 1000000).toFixed(2) + 'M';
+    } else if (population >= 1000) {
+      return (population / 1000).toFixed(1) + 'K';
+    }
+    return population.toLocaleString();
   }
 
   getWorldMapSVG(countries, visitedCountries, currentCountry, mapColor, visitedColor, currentColor) {

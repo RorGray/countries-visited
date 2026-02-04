@@ -54,7 +54,6 @@ countries-map-card .current-badge:not(.visible) {
 countries-map-card .map-container {
   position: relative;
   width: 100%;
-  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
   border-radius: 12px;
   overflow: hidden;
   touch-action: none; /* Prevent default touch actions for custom gestures */
@@ -139,7 +138,7 @@ countries-map-card .zoom-indicator.visible {
 }
 
 countries-map-card .country {
-  stroke: var(--card-background-color, #fff);
+  stroke: var(--primary-text-color, #1a1a1a);
   stroke-width: 0.5;
   transition: fill 0.3s ease, opacity 0.2s ease, stroke-width 0.2s ease;
   cursor: pointer;
@@ -176,7 +175,7 @@ countries-map-card .tooltip {
   color: var(--primary-text-color, #1a1a1a);
   padding: 6px 10px;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
   pointer-events: none;
@@ -185,10 +184,54 @@ countries-map-card .tooltip {
   z-index: 100;
   transform: translate(-50%, -100%);
   margin-top: -8px;
+  max-width: 250px;
+  line-height: 1.4;
 }
 
 countries-map-card .tooltip.visible {
   opacity: 1;
+}
+
+countries-map-card .tooltip-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  white-space: nowrap;
+}
+
+countries-map-card .tooltip-badge {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+countries-map-card .tooltip-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--divider-color, #e5e5e5);
+}
+
+countries-map-card .tooltip-info-item {
+  display: flex;
+  gap: 6px;
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+countries-map-card .tooltip-label {
+  font-weight: 600;
+  color: var(--secondary-text-color, #666);
+  flex-shrink: 0;
 }
 
 countries-map-card .legend {

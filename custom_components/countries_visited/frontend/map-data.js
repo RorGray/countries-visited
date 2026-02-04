@@ -105,9 +105,13 @@ export async function loadCountriesData() {
       return {
         id: id,
         d: d,
-        name: name
+        name: name,
+        info: info || null // Store full info object for tooltip
       };
     }).filter(c => c.id && c.d); // Filter out invalid entries
+    
+    // Store country info separately for easy lookup
+    countriesData._countryInfo = countryInfo;
     
     return countriesData;
   } catch (e) {
