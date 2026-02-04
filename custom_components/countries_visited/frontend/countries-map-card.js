@@ -1121,160 +1121,231 @@ class CountriesMapCardEditor extends HTMLElement {
       return;
     }
 
-    // Helper to escape HTML
-    const escapeHtml = (text) => {
-      if (!text) return '';
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
-    };
-
     const config = { ...this._config };
     // Handle both entity and person aliases
     const currentEntity = config.entity || config.person || '';
 
-    // Get all sensor entities for countries visited
-    const sensorEntities = Object.keys(this._hass.states)
-      .filter(id => id.startsWith('sensor.countries_visited_'))
-      .sort();
-
-    // Get all person entities
-    const personEntities = Object.keys(this._hass.states)
-      .filter(id => id.startsWith('person.'))
-      .sort();
-
-    // Combine for entity selector
-    const allEntities = [...sensorEntities, ...personEntities];
-
+    // Clear existing content and add styles
     this.innerHTML = `
-      <div style="padding: 16px;">
-        <div style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 8px; font-weight: bold;">
-            Entity
-          </label>
-          <select id="entity" style="width: 100%; padding: 8px; border: 1px solid var(--divider-color); border-radius: 4px;">
-            <option value="">-- Select Entity --</option>
-            ${allEntities.map(entity => `
-              <option value="${escapeHtml(entity)}" ${currentEntity === entity ? 'selected' : ''}>${escapeHtml(entity)}</option>
-            `).join('')}
-          </select>
-        </div>
-
-        <div style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 8px; font-weight: bold;">
-            Title (optional)
-          </label>
-          <input 
-            type="text" 
-            id="title" 
-            value="${escapeHtml(config.title || '')}" 
-            placeholder="Countries Visited"
-            style="width: 100%; padding: 8px; border: 1px solid var(--divider-color); border-radius: 4px;"
-          />
-        </div>
-
-        <div style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 8px; font-weight: bold;">
-            Visited Color
-          </label>
-          <input 
-            type="color" 
-            id="visited_color" 
-            value="${config.visited_color || '#4CAF50'}"
-            style="width: 100%; height: 40px; border: 1px solid var(--divider-color); border-radius: 4px; cursor: pointer;"
-          />
-        </div>
-
-        <div style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 8px; font-weight: bold;">
-            Current Color
-          </label>
-          <input 
-            type="color" 
-            id="current_color" 
-            value="${config.current_color || '#FF5722'}"
-            style="width: 100%; height: 40px; border: 1px solid var(--divider-color); border-radius: 4px; cursor: pointer;"
-          />
-        </div>
-
-        <div style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 8px; font-weight: bold;">
-            Country Color (default)
-          </label>
-          <input 
-            type="color" 
-            id="map_color" 
-            value="${config.map_color || '#d0d0d0'}"
-            style="width: 100%; height: 40px; border: 1px solid var(--divider-color); border-radius: 4px; cursor: pointer;"
-          />
-        </div>
-
-        <div style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 8px; font-weight: bold;">
-            Ocean Color (optional, transparent if empty)
-          </label>
-          <input 
-            type="color" 
-            id="ocean_color" 
-            value="${config.ocean_color || ''}"
-            style="width: 100%; height: 40px; border: 1px solid var(--divider-color); border-radius: 4px; cursor: pointer;"
-          />
-          <button 
-            id="clear_ocean" 
-            style="margin-top: 8px; padding: 6px 12px; background: var(--primary-color); color: var(--text-primary-color); border: none; border-radius: 4px; cursor: pointer;"
-          >
-            Clear (Transparent)
-          </button>
-        </div>
-      </div>
+      <style>
+        .card-config {
+          padding: 16px;
+        }
+        .form-group {
+          margin-bottom: 16px;
+        }
+        .form-group ha-entity-picker,
+        .form-group ha-textfield {
+          display: block;
+          width: 100%;
+        }
+      </style>
+      <div class="card-config"></div>
     `;
+    const container = this.querySelector('.card-config');
 
-    // Add event listeners
-    const entitySelect = this.querySelector('#entity');
-    const titleInput = this.querySelector('#title');
-    const visitedColorInput = this.querySelector('#visited_color');
-    const currentColorInput = this.querySelector('#current_color');
-    const mapColorInput = this.querySelector('#map_color');
-    const oceanColorInput = this.querySelector('#ocean_color');
-    const clearOceanBtn = this.querySelector('#clear_ocean');
-
-    const fireEvent = () => {
-      const event = new CustomEvent('config-changed', {
-        detail: { config: this._getConfig() },
-        bubbles: true,
-        composed: true
-      });
-      this.dispatchEvent(event);
+    // Create entity filter function for ha-entity-picker
+    const entityFilter = (entity) => {
+      return entity.entity_id.startsWith('sensor.countries_visited_') || 
+             entity.entity_id.startsWith('person.');
     };
 
-    entitySelect.addEventListener('change', fireEvent);
-    titleInput.addEventListener('input', fireEvent);
-    visitedColorInput.addEventListener('input', fireEvent);
-    currentColorInput.addEventListener('input', fireEvent);
-    mapColorInput.addEventListener('input', fireEvent);
-    oceanColorInput.addEventListener('input', fireEvent);
-    clearOceanBtn.addEventListener('click', () => {
-      oceanColorInput.value = '';
-      fireEvent();
+    // Entity picker
+    const entityGroup = document.createElement('div');
+    entityGroup.className = 'form-group';
+    const entityPicker = document.createElement('ha-entity-picker');
+    entityPicker.hass = this._hass;
+    entityPicker.value = currentEntity;
+    entityPicker.label = 'Entity';
+    entityPicker.includeDomains = ['sensor', 'person'];
+    entityPicker.entityFilter = entityFilter;
+    entityPicker.addEventListener('value-changed', (ev) => {
+      this._config.entity = ev.detail.value || '';
+      this._fireConfigChanged();
     });
+    entityGroup.appendChild(entityPicker);
+    container.appendChild(entityGroup);
+
+    // Title field
+    const titleGroup = document.createElement('div');
+    titleGroup.className = 'form-group';
+    const titleField = document.createElement('ha-textfield');
+    titleField.label = 'Title (optional)';
+    titleField.value = config.title || '';
+    titleField.placeholder = 'Countries Visited';
+    titleField.addEventListener('input', (ev) => {
+      this._config.title = ev.target.value || '';
+      this._fireConfigChanged();
+    });
+    titleGroup.appendChild(titleField);
+    container.appendChild(titleGroup);
+
+    // Visited color
+    const visitedColorGroup = document.createElement('div');
+    visitedColorGroup.className = 'form-group';
+    const visitedColorLabel = document.createElement('label');
+    visitedColorLabel.textContent = 'Visited Color';
+    visitedColorLabel.style.display = 'block';
+    visitedColorLabel.style.marginBottom = '8px';
+    visitedColorGroup.appendChild(visitedColorLabel);
+    const visitedColorInput = document.createElement('input');
+    visitedColorInput.type = 'color';
+    visitedColorInput.value = config.visited_color || '#4CAF50';
+    visitedColorInput.style.width = '100%';
+    visitedColorInput.style.height = '40px';
+    visitedColorInput.style.border = '1px solid var(--divider-color, #e0e0e0)';
+    visitedColorInput.style.borderRadius = '4px';
+    visitedColorInput.style.cursor = 'pointer';
+    visitedColorInput.addEventListener('input', (ev) => {
+      this._config.visited_color = ev.target.value || '#4CAF50';
+      this._fireConfigChanged();
+    });
+    visitedColorGroup.appendChild(visitedColorInput);
+    container.appendChild(visitedColorGroup);
+
+    // Current color
+    const currentColorGroup = document.createElement('div');
+    currentColorGroup.className = 'form-group';
+    const currentColorLabel = document.createElement('label');
+    currentColorLabel.textContent = 'Current Color';
+    currentColorLabel.style.display = 'block';
+    currentColorLabel.style.marginBottom = '8px';
+    currentColorGroup.appendChild(currentColorLabel);
+    const currentColorInput = document.createElement('input');
+    currentColorInput.type = 'color';
+    currentColorInput.value = config.current_color || '#FF5722';
+    currentColorInput.style.width = '100%';
+    currentColorInput.style.height = '40px';
+    currentColorInput.style.border = '1px solid var(--divider-color, #e0e0e0)';
+    currentColorInput.style.borderRadius = '4px';
+    currentColorInput.style.cursor = 'pointer';
+    currentColorInput.addEventListener('input', (ev) => {
+      this._config.current_color = ev.target.value || '#FF5722';
+      this._fireConfigChanged();
+    });
+    currentColorGroup.appendChild(currentColorInput);
+    container.appendChild(currentColorGroup);
+
+    // Map color
+    const mapColorGroup = document.createElement('div');
+    mapColorGroup.className = 'form-group';
+    const mapColorLabel = document.createElement('label');
+    mapColorLabel.textContent = 'Country Color (default)';
+    mapColorLabel.style.display = 'block';
+    mapColorLabel.style.marginBottom = '8px';
+    mapColorGroup.appendChild(mapColorLabel);
+    const mapColorInput = document.createElement('input');
+    mapColorInput.type = 'color';
+    mapColorInput.value = config.map_color || '#d0d0d0';
+    mapColorInput.style.width = '100%';
+    mapColorInput.style.height = '40px';
+    mapColorInput.style.border = '1px solid var(--divider-color, #e0e0e0)';
+    mapColorInput.style.borderRadius = '4px';
+    mapColorInput.style.cursor = 'pointer';
+    mapColorInput.addEventListener('input', (ev) => {
+      this._config.map_color = ev.target.value || '#d0d0d0';
+      this._fireConfigChanged();
+    });
+    mapColorGroup.appendChild(mapColorInput);
+    container.appendChild(mapColorGroup);
+
+    // Ocean color
+    const oceanColorGroup = document.createElement('div');
+    oceanColorGroup.className = 'form-group';
+    const oceanColorLabel = document.createElement('label');
+    oceanColorLabel.textContent = 'Ocean Color';
+    oceanColorLabel.style.display = 'block';
+    oceanColorLabel.style.marginBottom = '8px';
+    oceanColorGroup.appendChild(oceanColorLabel);
+
+    // Checkbox for transparent
+    const transparentCheckbox = document.createElement('ha-switch');
+    transparentCheckbox.checked = !config.ocean_color || config.ocean_color === '';
+    transparentCheckbox.style.marginBottom = '8px';
+    const transparentLabel = document.createElement('label');
+    transparentLabel.textContent = 'Transparent (default)';
+    transparentLabel.style.marginLeft = '8px';
+    transparentLabel.style.cursor = 'pointer';
+    transparentLabel.style.display = 'inline-block';
+    transparentLabel.addEventListener('click', () => {
+      transparentCheckbox.checked = !transparentCheckbox.checked;
+      transparentCheckbox.dispatchEvent(new Event('change'));
+    });
+    
+    const transparentContainer = document.createElement('div');
+    transparentContainer.style.display = 'flex';
+    transparentContainer.style.alignItems = 'center';
+    transparentContainer.appendChild(transparentCheckbox);
+    transparentContainer.appendChild(transparentLabel);
+    oceanColorGroup.appendChild(transparentContainer);
+
+    // Color input (disabled when transparent is checked)
+    const oceanColorInput = document.createElement('input');
+    oceanColorInput.type = 'color';
+    oceanColorInput.value = config.ocean_color || '#ffffff';
+    oceanColorInput.disabled = !config.ocean_color || config.ocean_color === '';
+    oceanColorInput.style.width = '100%';
+    oceanColorInput.style.height = '40px';
+    oceanColorInput.style.border = '1px solid var(--divider-color, #e0e0e0)';
+    oceanColorInput.style.borderRadius = '4px';
+    oceanColorInput.style.cursor = oceanColorInput.disabled ? 'not-allowed' : 'pointer';
+    oceanColorInput.style.opacity = oceanColorInput.disabled ? '0.5' : '1';
+    oceanColorInput.style.marginTop = '8px';
+    
+    transparentCheckbox.addEventListener('change', (ev) => {
+      if (ev.target.checked) {
+        // Transparent selected
+        this._config.ocean_color = '';
+        oceanColorInput.disabled = true;
+        oceanColorInput.style.cursor = 'not-allowed';
+        oceanColorInput.style.opacity = '0.5';
+      } else {
+        // Color selected
+        oceanColorInput.disabled = false;
+        oceanColorInput.style.cursor = 'pointer';
+        oceanColorInput.style.opacity = '1';
+        if (!this._config.ocean_color) {
+          this._config.ocean_color = oceanColorInput.value;
+        }
+      }
+      this._fireConfigChanged();
+    });
+    
+    oceanColorInput.addEventListener('input', (ev) => {
+      if (!oceanColorInput.disabled) {
+        this._config.ocean_color = ev.target.value;
+        this._fireConfigChanged();
+      }
+    });
+    oceanColorGroup.appendChild(oceanColorInput);
+    container.appendChild(oceanColorGroup);
+  }
+
+  _fireConfigChanged() {
+    const event = new CustomEvent('config-changed', {
+      detail: { config: this._getConfig() },
+      bubbles: true,
+      composed: true
+    });
+    this.dispatchEvent(event);
   }
 
   _getConfig() {
-    const entity = this.querySelector('#entity')?.value || '';
-    const title = this.querySelector('#title')?.value || '';
-    const visitedColor = this.querySelector('#visited_color')?.value || '#4CAF50';
-    const currentColor = this.querySelector('#current_color')?.value || '#FF5722';
-    const mapColor = this.querySelector('#map_color')?.value || '#d0d0d0';
-    const oceanColor = this.querySelector('#ocean_color')?.value || '';
-
     const config = {};
-    if (entity) config.entity = entity;
-    if (title) config.title = title;
-    if (visitedColor !== '#4CAF50') config.visited_color = visitedColor;
-    if (currentColor !== '#FF5722') config.current_color = currentColor;
-    if (mapColor !== '#d0d0d0') config.map_color = mapColor;
-    if (oceanColor) config.ocean_color = oceanColor;
-
+    if (this._config.entity) config.entity = this._config.entity;
+    if (this._config.title) config.title = this._config.title;
+    if (this._config.visited_color && this._config.visited_color !== '#4CAF50') {
+      config.visited_color = this._config.visited_color;
+    }
+    if (this._config.current_color && this._config.current_color !== '#FF5722') {
+      config.current_color = this._config.current_color;
+    }
+    if (this._config.map_color && this._config.map_color !== '#d0d0d0') {
+      config.map_color = this._config.map_color;
+    }
+    if (this._config.ocean_color) {
+      config.ocean_color = this._config.ocean_color;
+    }
     return config;
   }
 }
