@@ -1075,6 +1075,199 @@ class CountriesMapCard extends HTMLElement {
 
 customElements.define('countries-map-card', CountriesMapCard);
 
+// Visual editor for the card
+class CountriesMapCardEditor extends HTMLElement {
+  setConfig(config) {
+    this._config = config || {};
+    if (this._hass) {
+      this._buildEditor();
+    }
+  }
+
+  connectedCallback() {
+    if (this._hass) {
+      this._buildEditor();
+    }
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    if (this.parentElement) {
+      this._buildEditor();
+    }
+  }
+
+  _buildEditor() {
+    if (!this._hass) {
+      return;
+    }
+
+    // Helper to escape HTML
+    const escapeHtml = (text) => {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    };
+
+    const config = { ...this._config };
+    // Handle both entity and person aliases
+    const currentEntity = config.entity || config.person || '';
+
+    // Get all sensor entities for countries visited
+    const sensorEntities = Object.keys(this._hass.states)
+      .filter(id => id.startsWith('sensor.countries_visited_'))
+      .sort();
+
+    // Get all person entities
+    const personEntities = Object.keys(this._hass.states)
+      .filter(id => id.startsWith('person.'))
+      .sort();
+
+    // Combine for entity selector
+    const allEntities = [...sensorEntities, ...personEntities];
+
+    this.innerHTML = `
+      <div style="padding: 16px;">
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; margin-bottom: 8px; font-weight: bold;">
+            Entity
+          </label>
+          <select id="entity" style="width: 100%; padding: 8px; border: 1px solid var(--divider-color); border-radius: 4px;">
+            <option value="">-- Select Entity --</option>
+            ${allEntities.map(entity => `
+              <option value="${escapeHtml(entity)}" ${currentEntity === entity ? 'selected' : ''}>${escapeHtml(entity)}</option>
+            `).join('')}
+          </select>
+        </div>
+
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; margin-bottom: 8px; font-weight: bold;">
+            Title (optional)
+          </label>
+          <input 
+            type="text" 
+            id="title" 
+            value="${escapeHtml(config.title || '')}" 
+            placeholder="Countries Visited"
+            style="width: 100%; padding: 8px; border: 1px solid var(--divider-color); border-radius: 4px;"
+          />
+        </div>
+
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; margin-bottom: 8px; font-weight: bold;">
+            Visited Color
+          </label>
+          <input 
+            type="color" 
+            id="visited_color" 
+            value="${config.visited_color || '#4CAF50'}"
+            style="width: 100%; height: 40px; border: 1px solid var(--divider-color); border-radius: 4px; cursor: pointer;"
+          />
+        </div>
+
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; margin-bottom: 8px; font-weight: bold;">
+            Current Color
+          </label>
+          <input 
+            type="color" 
+            id="current_color" 
+            value="${config.current_color || '#FF5722'}"
+            style="width: 100%; height: 40px; border: 1px solid var(--divider-color); border-radius: 4px; cursor: pointer;"
+          />
+        </div>
+
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; margin-bottom: 8px; font-weight: bold;">
+            Map Color (default)
+          </label>
+          <input 
+            type="color" 
+            id="map_color" 
+            value="${config.map_color || '#d0d0d0'}"
+            style="width: 100%; height: 40px; border: 1px solid var(--divider-color); border-radius: 4px; cursor: pointer;"
+          />
+        </div>
+
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; margin-bottom: 8px; font-weight: bold;">
+            Ocean Color (optional, transparent if empty)
+          </label>
+          <input 
+            type="color" 
+            id="ocean_color" 
+            value="${config.ocean_color || ''}"
+            style="width: 100%; height: 40px; border: 1px solid var(--divider-color); border-radius: 4px; cursor: pointer;"
+          />
+          <button 
+            id="clear_ocean" 
+            style="margin-top: 8px; padding: 6px 12px; background: var(--primary-color); color: var(--text-primary-color); border: none; border-radius: 4px; cursor: pointer;"
+          >
+            Clear (Transparent)
+          </button>
+        </div>
+      </div>
+    `;
+
+    // Add event listeners
+    const entitySelect = this.querySelector('#entity');
+    const titleInput = this.querySelector('#title');
+    const visitedColorInput = this.querySelector('#visited_color');
+    const currentColorInput = this.querySelector('#current_color');
+    const mapColorInput = this.querySelector('#map_color');
+    const oceanColorInput = this.querySelector('#ocean_color');
+    const clearOceanBtn = this.querySelector('#clear_ocean');
+
+    const fireEvent = () => {
+      const event = new CustomEvent('config-changed', {
+        detail: { config: this._getConfig() },
+        bubbles: true,
+        composed: true
+      });
+      this.dispatchEvent(event);
+    };
+
+    entitySelect.addEventListener('change', fireEvent);
+    titleInput.addEventListener('input', fireEvent);
+    visitedColorInput.addEventListener('input', fireEvent);
+    currentColorInput.addEventListener('input', fireEvent);
+    mapColorInput.addEventListener('input', fireEvent);
+    oceanColorInput.addEventListener('input', fireEvent);
+    clearOceanBtn.addEventListener('click', () => {
+      oceanColorInput.value = '';
+      fireEvent();
+    });
+  }
+
+  _getConfig() {
+    const entity = this.querySelector('#entity')?.value || '';
+    const title = this.querySelector('#title')?.value || '';
+    const visitedColor = this.querySelector('#visited_color')?.value || '#4CAF50';
+    const currentColor = this.querySelector('#current_color')?.value || '#FF5722';
+    const mapColor = this.querySelector('#map_color')?.value || '#d0d0d0';
+    const oceanColor = this.querySelector('#ocean_color')?.value || '';
+
+    const config = {};
+    if (entity) config.entity = entity;
+    if (title) config.title = title;
+    if (visitedColor !== '#4CAF50') config.visited_color = visitedColor;
+    if (currentColor !== '#FF5722') config.current_color = currentColor;
+    if (mapColor !== '#d0d0d0') config.map_color = mapColor;
+    if (oceanColor) config.ocean_color = oceanColor;
+
+    return config;
+  }
+}
+
+// Register the editor
+customElements.define('countries-map-card-editor', CountriesMapCardEditor);
+
+// Add getConfigElement method to the card class
+CountriesMapCard.prototype.getConfigElement = function() {
+  return document.createElement('countries-map-card-editor');
+};
+
 // Register card with Home Assistant's card registry
 if (window.customCards) {
   window.customCards.push({
